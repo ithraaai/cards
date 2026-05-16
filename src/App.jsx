@@ -4,19 +4,21 @@ import {
   AreaChart, Area, Cell,
 } from 'recharts';
 import {
-  LayoutDashboard, ClipboardList, FileText, LogOut, Menu, AlertTriangle,
+  LayoutDashboard, ClipboardList, Settings, LogOut, Menu, AlertTriangle,
   CheckCircle2, Clock, User, KeyRound, Eye, EyeOff, Calendar, Award,
-  Target, Activity, Sparkles, Info, AlertCircle, MessageSquare, Camera,
-  Save, Plus, X, ChevronDown, ChevronLeft, ChevronRight, Lock, Copy,
-  ThumbsUp, ThumbsDown, HelpCircle, Star, Check, Building2, Bell,
-  TrendingUp, TrendingDown, Wifi, WifiOff, Recycle, Hash,
+  Activity, Info, AlertCircle, MessageSquare,
+  Plus, X, ChevronDown, ChevronLeft, ChevronRight, Lock,
+  ThumbsUp, ThumbsDown, HelpCircle, Check, Building2,
+  TrendingUp, TrendingDown, Wifi, Recycle, Users as UsersIcon,
+  Trash2, Edit2, Phone, Shield, Save, Hash,
 } from 'lucide-react';
 
 import { Button } from './components/Button.jsx';
 import { Card, Badge } from './components/Card.jsx';
 import { Input } from './components/Input.jsx';
-import { TEAMS } from './data/teams.js';
-import { DATES, TODAY_ID, COMPANIES, USERS, ROLES_CONFIG, SCALE_LABELS } from './data/seed.js';
+import { Logo } from './components/Logo.jsx';
+import { INITIAL_TEAMS, shouldShowCriterion, isTeamActiveOnDate } from './data/teams.js';
+import { DATES, COMPANIES, INITIAL_USERS, ROLES_CONFIG, SCALE_LABELS, getDefaultDateId, DEFAULT_SETTINGS } from './data/seed.js';
 import { THEME } from './data/theme.js';
 
 const genId = () => crypto.randomUUID ? crypto.randomUUID() : `id_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -26,13 +28,11 @@ const genId = () => crypto.randomUUID ? crypto.randomUUID() : `id_${Date.now()}_
 // =================================================================
 function useToast() {
   const [toasts, setToasts] = useState([]);
-
   const show = useCallback((message, type = 'info') => {
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
   }, []);
-
   return { toasts, show };
 }
 
@@ -76,9 +76,9 @@ function ToastContainer({ toasts }) {
 }
 
 // =================================================================
-// Login Page
+// Login Page - بدون الحسابات التجريبية
 // =================================================================
-function LoginPage({ onLogin, toast }) {
+function LoginPage({ onLogin, toast, users }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -93,7 +93,7 @@ function LoginPage({ onLogin, toast }) {
     }
     setLoading(true);
     await new Promise(r => setTimeout(r, 500));
-    const user = USERS.find(u => u.username === username && u.password === password && u.active);
+    const user = users.find(u => u.username === username && u.password === password && u.active);
     setLoading(false);
     if (!user) {
       setError('اسم المستخدم أو كلمة المرور غير صحيحة');
@@ -122,19 +122,15 @@ function LoginPage({ onLogin, toast }) {
       }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
-            width: 72,
-            height: 72,
-            borderRadius: THEME.radius.xl,
-            background: `linear-gradient(135deg, ${THEME.colors.primary} 0%, ${THEME.colors.accent} 100%)`,
-            margin: '0 auto 16px',
             display: 'flex',
-            alignItems: 'center',
             justifyContent: 'center',
+            marginBottom: 18,
           }}>
-            <Sparkles size={36} color="#fff" strokeWidth={2} />
+            <Logo height={80} />
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: THEME.colors.primary, marginBottom: 4 }}>إثراء التجربة</h1>
-          <p style={{ fontSize: 13, color: THEME.colors.textTertiary }}>نظام إدارة العمليات — موسم 1447هـ</p>
+          <p style={{ fontSize: 13, color: THEME.colors.textTertiary, marginTop: 8 }}>
+            نظام إدارة العمليات — موسم 1447هـ
+          </p>
         </div>
 
         {error && (
@@ -164,7 +160,6 @@ function LoginPage({ onLogin, toast }) {
             placeholder="أدخل اسم المستخدم"
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           />
-
           <div style={{ position: 'relative' }}>
             <Input
               label="كلمة المرور"
@@ -192,26 +187,9 @@ function LoginPage({ onLogin, toast }) {
               {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
-
           <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={loading} style={{ marginTop: 6 }}>
             {loading ? 'جاري التحقق...' : 'تسجيل الدخول'}
           </Button>
-        </div>
-
-        <div style={{
-          marginTop: 24,
-          padding: 14,
-          background: THEME.colors.bgSecondary,
-          borderRadius: THEME.radius.md,
-          fontSize: 12,
-          color: THEME.colors.textSecondary,
-        }}>
-          <div style={{ fontWeight: 700, marginBottom: 6, color: THEME.colors.text }}>حسابات تجريبية:</div>
-          <div style={{ lineHeight: 1.8 }}>
-            <div>• مدير: <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>admin / admin</code></div>
-            <div>• مدخل بيانات: <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>ahmed / 1234</code></div>
-            <div>• داشبورد: <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>fahad / 1234</code></div>
-          </div>
         </div>
       </div>
     </div>
@@ -221,14 +199,14 @@ function LoginPage({ onLogin, toast }) {
 // =================================================================
 // Dashboard Page
 // =================================================================
-function DashboardPage() {
+function DashboardPage({ teams }) {
   const dailyTrend = DATES.map((d, i) => ({
     day: d.id,
     compliance: Math.round(75 + Math.sin(i * 0.7) * 8 + i * 1.5),
     issues: Math.max(5, Math.round(18 - i * 1.2 + Math.sin(i * 1.5) * 3)),
   }));
 
-  const teamPerf = TEAMS.map(t => ({
+  const teamPerf = teams.map(t => ({
     name: t.name.replace('فريق ', '').replace('الفريق ', ''),
     rate: Math.round(75 + Math.random() * 20),
   }));
@@ -252,7 +230,7 @@ function DashboardPage() {
           <div style={{ fontSize: 15, fontWeight: 700 }}>الاتجاه اليومي للامتثال والملاحظات</div>
         </div>
         <ResponsiveContainer width="100%" height={260}>
-          <AreaChart data={dailyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <AreaChart data={dailyTrend}>
             <defs>
               <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={THEME.colors.accent} stopOpacity={0.35} />
@@ -275,10 +253,10 @@ function DashboardPage() {
 
       <Card padding={20}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <Target size={20} color={THEME.colors.primary} strokeWidth={2} />
+          <UsersIcon size={20} color={THEME.colors.primary} strokeWidth={2} />
           <div style={{ fontSize: 15, fontWeight: 700 }}>أداء الفرق</div>
         </div>
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={300}>
           <BarChart data={teamPerf} layout="vertical" margin={{ right: 10, left: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={THEME.colors.border} horizontal={false} />
             <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
@@ -347,17 +325,15 @@ function KPICard({ icon: Icon, label, value, unit, trend, trendValue, color = 'a
 }
 
 // =================================================================
-// Value Selector — يدعم الآن أنواع المعايير الجديدة
+// Value Selector — مع المسميات النصية بدل النجوم
 // =================================================================
 function ValueSelector({ criterion, value, onChange, disabled }) {
-  // نوع نعم/لا
   if (criterion.type === 'yesno') {
     const options = [
       { val: 'yes', label: 'نعم', icon: ThumbsUp, color: THEME.colors.success, bg: THEME.colors.successSoft },
       { val: 'no', label: 'لا', icon: ThumbsDown, color: THEME.colors.danger, bg: THEME.colors.dangerSoft },
       { val: 'na', label: 'غير منطبق', icon: HelpCircle, color: THEME.colors.textTertiary, bg: THEME.colors.bgSecondary },
     ];
-
     return (
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {options.map(o => {
@@ -394,11 +370,10 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
     );
   }
 
-  // نوع تقييم 1-5
   if (criterion.type === 'scale') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr) auto', gap: 6 }}>
           {[1, 2, 3, 4, 5].map(n => {
             const isSelected = value === n;
             const sl = SCALE_LABELS[n];
@@ -408,8 +383,7 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
                 onClick={() => !disabled && onChange(n)}
                 disabled={disabled}
                 style={{
-                  flex: 1,
-                  minHeight: 56,
+                  minHeight: 76,
                   background: isSelected ? sl.bg : THEME.colors.surface,
                   border: `2px solid ${isSelected ? sl.color : THEME.colors.border}`,
                   borderRadius: THEME.radius.md,
@@ -417,21 +391,21 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 2,
+                  gap: 4,
+                  padding: '6px 4px',
                   opacity: disabled ? 0.5 : 1,
+                  cursor: disabled ? 'not-allowed' : 'pointer',
                 }}
               >
-                <div style={{ fontSize: 22, fontWeight: 800, color: isSelected ? sl.color : THEME.colors.textTertiary, lineHeight: 1 }}>{n}</div>
-                <div style={{ display: 'flex', gap: 1, marginTop: 2 }}>
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      size={8}
-                      fill={i < n ? (isSelected ? sl.color : THEME.colors.textTertiary) : 'none'}
-                      color={isSelected ? sl.color : THEME.colors.borderStrong}
-                      strokeWidth={1.5}
-                    />
-                  ))}
+                <div style={{ fontSize: 24, fontWeight: 800, color: isSelected ? sl.color : THEME.colors.textTertiary, lineHeight: 1 }}>{n}</div>
+                <div style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: isSelected ? sl.color : THEME.colors.textSecondary,
+                  textAlign: 'center',
+                  lineHeight: 1.2,
+                }}>
+                  {sl.text}
                 </div>
               </button>
             );
@@ -440,12 +414,12 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
             onClick={() => !disabled && onChange('na')}
             disabled={disabled}
             style={{
-              minHeight: 56,
-              padding: '8px 12px',
+              minHeight: 76,
+              padding: '6px 10px',
               background: value === 'na' ? THEME.colors.bgSecondary : THEME.colors.surface,
               border: `2px solid ${value === 'na' ? THEME.colors.borderStrong : THEME.colors.border}`,
               borderRadius: THEME.radius.md,
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: 700,
               color: THEME.colors.textSecondary,
               display: 'flex',
@@ -453,30 +427,17 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
               alignItems: 'center',
               justifyContent: 'center',
               gap: 4,
+              cursor: disabled ? 'not-allowed' : 'pointer',
             }}
           >
-            <HelpCircle size={18} />
+            <HelpCircle size={20} />
             <span style={{ fontSize: 10 }}>غير منطبق</span>
           </button>
         </div>
-        {value && value !== 'na' && (
-          <div style={{
-            padding: '6px 12px',
-            background: SCALE_LABELS[value]?.bg,
-            color: SCALE_LABELS[value]?.color,
-            borderRadius: THEME.radius.sm,
-            fontSize: 12,
-            fontWeight: 700,
-            textAlign: 'center',
-          }}>
-            {SCALE_LABELS[value]?.text}
-          </div>
-        )}
       </div>
     );
   }
 
-  // نوع رقمي (للنفايات بالكجم وعدد الأكياس)
   if (criterion.type === 'number') {
     return (
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -515,31 +476,6 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
           </div>
         )}
       </div>
-    );
-  }
-
-  // نوع نصي
-  if (criterion.type === 'text') {
-    return (
-      <textarea
-        value={value ?? ''}
-        onChange={e => !disabled && onChange(e.target.value)}
-        disabled={disabled}
-        rows={3}
-        placeholder="أدخل البيانات..."
-        style={{
-          width: '100%',
-          padding: '12px 14px',
-          fontSize: 14,
-          borderRadius: THEME.radius.md,
-          border: `2px solid ${THEME.colors.border}`,
-          outline: 'none',
-          direction: 'rtl',
-          resize: 'vertical',
-          boxSizing: 'border-box',
-          fontFamily: 'inherit',
-        }}
-      />
     );
   }
 
@@ -600,6 +536,11 @@ function CriterionCard({ criterion, index, value, note, onValueChange, onNoteCha
                 ملاحظة إلزامية
               </Badge>
             )}
+            {criterion.repeat === 'first_day_only' && (
+              <Badge color="info" style={{ fontSize: 10 }}>
+                أول يوم فقط
+              </Badge>
+            )}
           </div>
         </div>
       </div>
@@ -639,20 +580,33 @@ function CriterionCard({ criterion, index, value, note, onValueChange, onNoteCha
 }
 
 // =================================================================
-// Data Entry Page
+// Data Entry Page — مع الحفظ التلقائي بدون زر
 // =================================================================
-function DataEntryPage({ user, toast }) {
-  const [activeDate, setActiveDate] = useState(TODAY_ID);
-  const [activeTeamId, setActiveTeamId] = useState(TEAMS[0].id);
+function DataEntryPage({ user, teams, settings, toast }) {
+  const todayId = useMemo(() => getDefaultDateId(settings.seasonStartDate), [settings.seasonStartDate]);
+  const [activeDate, setActiveDate] = useState(todayId);
+  const [activeTeamId, setActiveTeamId] = useState(teams[0]?.id);
   const [evaluations, setEvaluations] = useState({});
-  const [lastSaved, setLastSaved] = useState(null);
+  const [savedIndicator, setSavedIndicator] = useState(false);
 
-  const activeTeam = TEAMS.find(t => t.id === activeTeamId);
+  const activeTeam = teams.find(t => t.id === activeTeamId);
   const activeIdx = DATES.findIndex(d => d.id === activeDate);
-  const todayIdx = DATES.findIndex(d => d.id === TODAY_ID);
+  const todayIdx = DATES.findIndex(d => d.id === todayId);
   const isLocked = activeIdx > todayIdx;
+  const teamActive = activeTeam ? isTeamActiveOnDate(activeTeam, activeDate) : false;
+
+  // المعايير التي يجب عرضها في هذا اليوم
+  const visibleCriteria = useMemo(() => {
+    if (!activeTeam) return [];
+    return activeTeam.criteria.filter(c => shouldShowCriterion(c, activeTeam, activeDate));
+  }, [activeTeam, activeDate]);
 
   const getKey = (criterionId) => `${user.companyId}_${user.section}_${activeDate}_${criterionId}`;
+
+  const showSavedBriefly = useCallback(() => {
+    setSavedIndicator(true);
+    setTimeout(() => setSavedIndicator(false), 2000);
+  }, []);
 
   const updateValue = useCallback((criterionId, val) => {
     if (isLocked) {
@@ -664,8 +618,8 @@ function DataEntryPage({ user, toast }) {
       ...prev,
       [key]: { ...prev[key], value: val, updatedAt: new Date().toISOString() },
     }));
-    setTimeout(() => setLastSaved(new Date()), 1500);
-  }, [isLocked, activeDate, user, toast]);
+    showSavedBriefly();
+  }, [isLocked, activeDate, user, toast, showSavedBriefly]);
 
   const updateNote = useCallback((criterionId, note) => {
     const key = getKey(criterionId);
@@ -673,26 +627,41 @@ function DataEntryPage({ user, toast }) {
       ...prev,
       [key]: { ...prev[key], note, updatedAt: new Date().toISOString() },
     }));
-    setTimeout(() => setLastSaved(new Date()), 1500);
-  }, [activeDate, user]);
+    showSavedBriefly();
+  }, [activeDate, user, showSavedBriefly]);
 
   const progressMap = useMemo(() => {
     const map = {};
-    TEAMS.forEach(t => {
+    teams.forEach(t => {
+      if (!isTeamActiveOnDate(t, activeDate)) {
+        map[t.id] = { filled: 0, total: 0, inactive: true };
+        return;
+      }
+      const visible = t.criteria.filter(c => shouldShowCriterion(c, t, activeDate));
       let filled = 0;
-      t.criteria.forEach(c => {
+      visible.forEach(c => {
         const e = evaluations[getKey(c.id)];
         if (e?.value !== undefined && e?.value !== null && e?.value !== '') filled++;
       });
-      map[t.id] = { filled, total: t.criteria.length };
+      map[t.id] = { filled, total: visible.length, inactive: false };
     });
     return map;
-  }, [evaluations, activeDate, user]);
+  }, [evaluations, activeDate, user, teams]);
 
-  const currentProgress = progressMap[activeTeamId];
+  const currentProgress = progressMap[activeTeamId] || { filled: 0, total: 0 };
 
   return (
     <div>
+      {/* Season warning if not set */}
+      {!settings.seasonStartDate && (
+        <Card padding={14} style={{ marginBottom: 14, background: THEME.colors.warningSoft, border: `1.5px solid ${THEME.colors.warning}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: THEME.colors.warning, fontSize: 13, fontWeight: 600 }}>
+            <AlertTriangle size={18} />
+            لم يُحدَّد تاريخ بداية موسم ذي الحجة بعد. يرجى من مدير النظام تحديده من الإعدادات.
+          </div>
+        </Card>
+      )}
+
       {/* Date picker */}
       <Card padding={14} style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -713,9 +682,9 @@ function DataEntryPage({ user, toast }) {
               {isLocked && <Lock size={14} />}
             </div>
             <div style={{ fontSize: 11, color: THEME.colors.textSecondary, marginTop: 2 }}>
-              {DATES[activeIdx].gregorian}
-              {DATES[activeIdx].special && ` · ${DATES[activeIdx].special}`}
+              {DATES[activeIdx].special && DATES[activeIdx].special}
               {isLocked && ' · يوم قادم (مقفل)'}
+              {activeDate === todayId && !isLocked && ' · اليوم'}
             </div>
           </div>
           <Button size="sm" variant="outline" icon={ChevronLeft}
@@ -727,10 +696,36 @@ function DataEntryPage({ user, toast }) {
 
       {/* Team selector */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8, marginBottom: 16 }}>
-        {TEAMS.map(t => {
+        {teams.map(t => {
           const isActive = t.id === activeTeamId;
           const progress = progressMap[t.id];
-          const pct = (progress.filled / progress.total) * 100;
+          const pct = progress.total > 0 ? (progress.filled / progress.total) * 100 : 0;
+
+          if (progress.inactive) {
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTeamId(t.id)}
+                style={{
+                  padding: '12px 14px',
+                  background: isActive ? THEME.colors.bgSecondary : 'transparent',
+                  color: THEME.colors.textTertiary,
+                  border: `1.5px dashed ${THEME.colors.border}`,
+                  borderRadius: THEME.radius.md,
+                  textAlign: 'right',
+                  minHeight: 76,
+                  cursor: 'pointer',
+                  opacity: 0.6,
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{t.name}</div>
+                <div style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Lock size={11} />
+                  يبدأ من {DATES.find(d => d.id === t.startDateId)?.label}
+                </div>
+              </button>
+            );
+          }
 
           return (
             <button
@@ -748,7 +743,7 @@ function DataEntryPage({ user, toast }) {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 700 }}>{t.name}</span>
-                {pct === 100 && <CheckCircle2 size={16} color={isActive ? '#90E0B5' : THEME.colors.success} />}
+                {pct === 100 && progress.total > 0 && <CheckCircle2 size={16} color={isActive ? '#90E0B5' : THEME.colors.success} />}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.85 }}>
                 <div style={{ flex: 1, height: 4, background: isActive ? 'rgba(255,255,255,0.15)' : THEME.colors.bgSecondary, borderRadius: 2 }}>
@@ -768,56 +763,713 @@ function DataEntryPage({ user, toast }) {
       <Card padding={16} style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>{activeTeam.name}</div>
-            <Badge color={currentProgress.filled === currentProgress.total ? 'success' : 'accent'}>
-              {currentProgress.filled} / {currentProgress.total} معبّأ
-            </Badge>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{activeTeam?.name}</div>
+            {teamActive && (
+              <Badge color={currentProgress.filled === currentProgress.total ? 'success' : 'accent'}>
+                {currentProgress.filled} / {currentProgress.total} معبّأ
+              </Badge>
+            )}
           </div>
-          {lastSaved && (
+          {savedIndicator && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: THEME.colors.success, fontWeight: 600 }}>
               <CheckCircle2 size={14} />
-              تم الحفظ التلقائي
+              تم الحفظ تلقائياً
             </div>
           )}
         </div>
-        <div style={{ fontSize: 12, color: THEME.colors.textTertiary, marginTop: 6 }}>{activeTeam.description}</div>
+        <div style={{ fontSize: 12, color: THEME.colors.textTertiary, marginTop: 6 }}>{activeTeam?.description}</div>
       </Card>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 80 }}>
-        {activeTeam.criteria.map((c, i) => {
-          const e = evaluations[getKey(c.id)];
+      {/* Team not active warning */}
+      {!teamActive && activeTeam && (
+        <Card padding={20} style={{ textAlign: 'center', background: THEME.colors.bgSecondary }}>
+          <Lock size={32} color={THEME.colors.textTertiary} style={{ margin: '0 auto 10px' }} />
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>هذا الفريق لم يبدأ العمل بعد</div>
+          <div style={{ fontSize: 12, color: THEME.colors.textTertiary }}>
+            يبدأ العمل في {DATES.find(d => d.id === activeTeam.startDateId)?.label}
+          </div>
+        </Card>
+      )}
+
+      {teamActive && visibleCriteria.length === 0 && (
+        <Card padding={20} style={{ textAlign: 'center' }}>
+          <Info size={32} color={THEME.colors.info} style={{ margin: '0 auto 10px' }} />
+          <div style={{ fontSize: 14, fontWeight: 700 }}>لا توجد معايير للتعبئة في هذا اليوم</div>
+        </Card>
+      )}
+
+      {teamActive && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 20 }}>
+          {visibleCriteria.map((c, i) => {
+            const e = evaluations[getKey(c.id)];
+            return (
+              <CriterionCard
+                key={c.id}
+                criterion={c}
+                index={i}
+                value={e?.value}
+                note={e?.note}
+                onValueChange={(v) => updateValue(c.id, v)}
+                onNoteChange={(n) => updateNote(c.id, n)}
+                disabled={isLocked}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =================================================================
+// Admin: Users Management
+// =================================================================
+function UsersPage({ users, setUsers, toast }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({
+    name: '', username: '', password: '', role: 'data_entry',
+    companyId: 'c1', section: 'رجال', phone: '',
+  });
+
+  const openNew = () => {
+    setEditing(null);
+    setForm({ name: '', username: '', password: '', role: 'data_entry', companyId: 'c1', section: 'رجال', phone: '' });
+    setShowForm(true);
+  };
+
+  const openEdit = (u) => {
+    setEditing(u);
+    setForm({ ...u, password: '' });
+    setShowForm(true);
+  };
+
+  const save = () => {
+    if (!form.name || !form.username) {
+      toast.show('الاسم واسم المستخدم مطلوبان', 'warning');
+      return;
+    }
+    if (!editing && !form.password) {
+      toast.show('كلمة المرور مطلوبة للحساب الجديد', 'warning');
+      return;
+    }
+
+    const dup = users.find(u => u.username === form.username && u.id !== editing?.id);
+    if (dup) {
+      toast.show('اسم المستخدم مستخدم مسبقاً', 'warning');
+      return;
+    }
+
+    if (editing) {
+      setUsers(prev => prev.map(u => u.id === editing.id ? {
+        ...u, ...form,
+        password: form.password || u.password,
+      } : u));
+      toast.show('تم تحديث الحساب', 'success');
+    } else {
+      const newUser = {
+        ...form,
+        id: genId(),
+        active: true,
+      };
+      setUsers(prev => [...prev, newUser]);
+      toast.show('تم إضافة الحساب', 'success');
+    }
+    setShowForm(false);
+  };
+
+  const remove = (u) => {
+    if (u.username === 'admin') {
+      toast.show('لا يمكن حذف حساب المدير الرئيسي', 'warning');
+      return;
+    }
+    if (confirm(`هل أنت متأكد من حذف ${u.name}؟`)) {
+      setUsers(prev => prev.filter(x => x.id !== u.id));
+      toast.show('تم حذف الحساب', 'info');
+    }
+  };
+
+  const toggleActive = (u) => {
+    if (u.username === 'admin') {
+      toast.show('لا يمكن تعطيل حساب المدير الرئيسي', 'warning');
+      return;
+    }
+    setUsers(prev => prev.map(x => x.id === u.id ? { ...x, active: !x.active } : x));
+    toast.show(u.active ? 'تم تعطيل الحساب' : 'تم تفعيل الحساب', 'info');
+  };
+
+  if (showForm) {
+    return (
+      <Card padding={20}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700 }}>
+            {editing ? `تعديل: ${editing.name}` : 'إضافة حساب جديد'}
+          </h2>
+          <Button variant="ghost" icon={X} onClick={() => setShowForm(false)} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Input label="الاسم الكامل" icon={User} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="مثلاً: أحمد محمد" />
+          <Input label="اسم المستخدم" icon={User} value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))} placeholder="بالحروف الإنجليزية" />
+          <Input
+            label={editing ? 'كلمة المرور (اتركها فارغة للإبقاء عليها)' : 'كلمة المرور'}
+            icon={KeyRound}
+            type="password"
+            value={form.password}
+            onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+          />
+          <Input label="رقم الجوال" icon={Phone} value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="05XXXXXXXX" />
+
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>الصلاحية</label>
+            <select
+              value={form.role}
+              onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                fontSize: 15,
+                borderRadius: THEME.radius.md,
+                border: `1.5px solid ${THEME.colors.border}`,
+                direction: 'rtl',
+                outline: 'none',
+                minHeight: 48,
+                background: '#fff',
+              }}
+            >
+              <option value="admin">مدير النظام</option>
+              <option value="dashboard">عرض لوحة المتابعة</option>
+              <option value="data_entry">مدخل بيانات</option>
+            </select>
+          </div>
+
+          {form.role === 'data_entry' && (
+            <>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>الشركة</label>
+                <select
+                  value={form.companyId}
+                  onChange={e => setForm(p => ({ ...p, companyId: e.target.value }))}
+                  style={{
+                    width: '100%', padding: '12px 14px', fontSize: 15,
+                    borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
+                    direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff',
+                  }}
+                >
+                  {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>القسم</label>
+                <select
+                  value={form.section}
+                  onChange={e => setForm(p => ({ ...p, section: e.target.value }))}
+                  style={{
+                    width: '100%', padding: '12px 14px', fontSize: 15,
+                    borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
+                    direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff',
+                  }}
+                >
+                  <option value="رجال">رجال</option>
+                  <option value="نساء">نساء</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <Button variant="primary" icon={Save} onClick={save} fullWidth>حفظ</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)} fullWidth>إلغاء</Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700 }}>إدارة الحسابات</h2>
+        <Button variant="primary" icon={Plus} onClick={openNew}>إضافة حساب جديد</Button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {users.map(u => {
+          const role = ROLES_CONFIG[u.role];
+          const company = COMPANIES.find(c => c.id === u.companyId);
           return (
-            <CriterionCard
-              key={c.id}
-              criterion={c}
-              index={i}
-              value={e?.value}
-              note={e?.note}
-              onValueChange={(v) => updateValue(c.id, v)}
-              onNoteChange={(n) => updateNote(c.id, n)}
-              disabled={isLocked}
-            />
+            <Card key={u.id} padding={14}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '50%',
+                  background: role?.color || THEME.colors.primary,
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: 18,
+                  flexShrink: 0,
+                }}>
+                  {u.name.charAt(0)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>{u.name}</span>
+                    {!u.active && <Badge color="gray">معطّل</Badge>}
+                  </div>
+                  <div style={{ fontSize: 12, color: THEME.colors.textSecondary, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                    <span><User size={11} style={{ display: 'inline', marginLeft: 4 }} />{u.username}</span>
+                    <span><Shield size={11} style={{ display: 'inline', marginLeft: 4 }} />{role?.label}</span>
+                    {company && <span><Building2 size={11} style={{ display: 'inline', marginLeft: 4 }} />{company.name} — {u.section}</span>}
+                    {u.phone && <span><Phone size={11} style={{ display: 'inline', marginLeft: 4 }} />{u.phone}</span>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <Button size="sm" variant="outline" icon={Edit2} onClick={() => openEdit(u)} />
+                  <Button size="sm" variant={u.active ? 'outline' : 'success'} onClick={() => toggleActive(u)}>
+                    {u.active ? 'تعطيل' : 'تفعيل'}
+                  </Button>
+                  {u.username !== 'admin' && (
+                    <Button size="sm" variant="danger" icon={Trash2} onClick={() => remove(u)} />
+                  )}
+                </div>
+              </div>
+            </Card>
           );
         })}
       </div>
+    </div>
+  );
+}
 
-      <div style={{
-        position: 'sticky',
-        bottom: 0,
-        background: `linear-gradient(to top, ${THEME.colors.bg} 70%, transparent)`,
-        padding: '16px 0 8px',
-      }}>
-        <Button
-          variant="primary"
-          size="lg"
-          icon={Save}
-          fullWidth
-          onClick={() => { setLastSaved(new Date()); toast.show('تم حفظ التقييم ✓', 'success'); }}
-          disabled={isLocked}
-        >
-          حفظ التقييم
-        </Button>
+// =================================================================
+// Admin: Teams Management
+// =================================================================
+function TeamsManagementPage({ teams, setTeams, toast }) {
+  const [expandedTeam, setExpandedTeam] = useState(null);
+  const [editingCriterion, setEditingCriterion] = useState(null);
+  const [showAddTeam, setShowAddTeam] = useState(false);
+  const [teamForm, setTeamForm] = useState({ name: '', description: '', startDateId: '1' });
+
+  const updateTeam = (teamId, updates) => {
+    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, ...updates } : t));
+    toast.show('تم تحديث الفريق', 'success');
+  };
+
+  const addCriterion = (teamId) => {
+    setEditingCriterion({
+      teamId,
+      isNew: true,
+      criterion: {
+        id: 'c_' + genId(),
+        name: '',
+        type: 'yesno',
+        noteRequired: 'no',
+        repeat: 'daily',
+      },
+    });
+  };
+
+  const editCriterion = (teamId, criterion) => {
+    setEditingCriterion({ teamId, isNew: false, criterion: { ...criterion } });
+  };
+
+  const saveCriterion = () => {
+    const { teamId, isNew, criterion } = editingCriterion;
+    if (!criterion.name) {
+      toast.show('اسم المعيار مطلوب', 'warning');
+      return;
+    }
+
+    setTeams(prev => prev.map(t => {
+      if (t.id !== teamId) return t;
+      const criteria = isNew
+        ? [...t.criteria, criterion]
+        : t.criteria.map(c => c.id === criterion.id ? criterion : c);
+      return { ...t, criteria };
+    }));
+
+    toast.show(isNew ? 'تم إضافة المعيار' : 'تم تحديث المعيار', 'success');
+    setEditingCriterion(null);
+  };
+
+  const deleteCriterion = (teamId, criterionId) => {
+    if (!confirm('هل أنت متأكد من حذف هذا المعيار؟')) return;
+    setTeams(prev => prev.map(t => t.id === teamId ? {
+      ...t,
+      criteria: t.criteria.filter(c => c.id !== criterionId),
+    } : t));
+    toast.show('تم حذف المعيار', 'info');
+  };
+
+  const deleteTeam = (teamId) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الفريق وكل معاييره؟')) return;
+    setTeams(prev => prev.filter(t => t.id !== teamId));
+    toast.show('تم حذف الفريق', 'info');
+  };
+
+  const addNewTeam = () => {
+    if (!teamForm.name) {
+      toast.show('اسم الفريق مطلوب', 'warning');
+      return;
+    }
+    setTeams(prev => [...prev, {
+      id: 't_' + genId(),
+      ...teamForm,
+      criteria: [],
+    }]);
+    toast.show('تم إضافة الفريق', 'success');
+    setShowAddTeam(false);
+    setTeamForm({ name: '', description: '', startDateId: '1' });
+  };
+
+  // Criterion editor
+  if (editingCriterion) {
+    const c = editingCriterion.criterion;
+    const updateField = (field, value) => {
+      setEditingCriterion(prev => ({
+        ...prev,
+        criterion: { ...prev.criterion, [field]: value },
+      }));
+    };
+
+    return (
+      <Card padding={20}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700 }}>
+            {editingCriterion.isNew ? 'إضافة معيار جديد' : 'تعديل المعيار'}
+          </h2>
+          <Button variant="ghost" icon={X} onClick={() => setEditingCriterion(null)} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>نص المعيار</label>
+            <textarea
+              value={c.name}
+              onChange={e => updateField('name', e.target.value)}
+              placeholder="مثلاً: تواجد مدير الموقع في استقبال ضيوف الرحمن"
+              rows={2}
+              style={{
+                width: '100%', padding: '12px 14px', fontSize: 15,
+                borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
+                direction: 'rtl', outline: 'none', boxSizing: 'border-box',
+                fontFamily: 'inherit', resize: 'vertical',
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>
+              نوع الإجابة
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+              {[
+                { val: 'yesno', label: 'نعم / لا', icon: ThumbsUp },
+                { val: 'scale', label: 'تقييم من 5', icon: Award },
+                { val: 'number', label: 'رقم', icon: Hash },
+              ].map(opt => {
+                const Icon = opt.icon;
+                const selected = c.type === opt.val;
+                return (
+                  <button
+                    key={opt.val}
+                    onClick={() => updateField('type', opt.val)}
+                    style={{
+                      padding: '12px 14px',
+                      background: selected ? THEME.colors.primary : THEME.colors.surface,
+                      color: selected ? '#fff' : THEME.colors.text,
+                      border: `2px solid ${selected ? THEME.colors.primary : THEME.colors.border}`,
+                      borderRadius: THEME.radius.md,
+                      fontSize: 13, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      minHeight: 48, cursor: 'pointer',
+                    }}
+                  >
+                    <Icon size={16} />
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {c.type === 'number' && (
+            <Input
+              label="وحدة القياس (مثلاً: كجم، كيس)"
+              value={c.unit || ''}
+              onChange={e => updateField('unit', e.target.value)}
+              placeholder="كجم"
+            />
+          )}
+
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>
+              تكرار السؤال
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+              {[
+                { val: 'daily', label: 'يتكرر كل يوم', desc: 'يظهر في كل أيام عمل الفريق' },
+                { val: 'first_day_only', label: 'أول يوم فقط', desc: 'يظهر في يوم بدء الفريق فقط' },
+              ].map(opt => {
+                const selected = c.repeat === opt.val;
+                return (
+                  <button
+                    key={opt.val}
+                    onClick={() => updateField('repeat', opt.val)}
+                    style={{
+                      padding: '12px 14px',
+                      background: selected ? THEME.colors.primary : THEME.colors.surface,
+                      color: selected ? '#fff' : THEME.colors.text,
+                      border: `2px solid ${selected ? THEME.colors.primary : THEME.colors.border}`,
+                      borderRadius: THEME.radius.md,
+                      fontSize: 13, fontWeight: 700,
+                      display: 'flex', flexDirection: 'column', gap: 4,
+                      minHeight: 56, cursor: 'pointer', textAlign: 'right',
+                    }}
+                  >
+                    <span>{opt.label}</span>
+                    <span style={{ fontSize: 10, opacity: 0.8, fontWeight: 500 }}>{opt.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>
+              إلزامية الملاحظة
+            </label>
+            <select
+              value={c.noteRequired}
+              onChange={e => updateField('noteRequired', e.target.value)}
+              style={{
+                width: '100%', padding: '12px 14px', fontSize: 15,
+                borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
+                direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff',
+              }}
+            >
+              <option value="no">اختيارية</option>
+              <option value="low">إلزامية عند التقييم السلبي</option>
+              <option value="always">إلزامية دائماً</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <Button variant="primary" icon={Save} onClick={saveCriterion} fullWidth>حفظ</Button>
+            <Button variant="outline" onClick={() => setEditingCriterion(null)} fullWidth>إلغاء</Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  // New team form
+  if (showAddTeam) {
+    return (
+      <Card padding={20}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700 }}>إضافة فريق جديد</h2>
+          <Button variant="ghost" icon={X} onClick={() => setShowAddTeam(false)} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Input label="اسم الفريق" value={teamForm.name} onChange={e => setTeamForm(p => ({ ...p, name: e.target.value }))} placeholder="مثلاً: فريق الإسعاف" />
+          <Input label="الوصف" value={teamForm.description} onChange={e => setTeamForm(p => ({ ...p, description: e.target.value }))} placeholder="وصف موجز لمهام الفريق" />
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>تاريخ بدء العمل</label>
+            <select
+              value={teamForm.startDateId}
+              onChange={e => setTeamForm(p => ({ ...p, startDateId: e.target.value }))}
+              style={{
+                width: '100%', padding: '12px 14px', fontSize: 15,
+                borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
+                direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff',
+              }}
+            >
+              {DATES.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Button variant="primary" icon={Save} onClick={addNewTeam} fullWidth>إضافة الفريق</Button>
+            <Button variant="outline" onClick={() => setShowAddTeam(false)} fullWidth>إلغاء</Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700 }}>إدارة الفرق والمعايير</h2>
+        <Button variant="primary" icon={Plus} onClick={() => setShowAddTeam(true)}>إضافة فريق جديد</Button>
       </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {teams.map(team => {
+          const isExpanded = expandedTeam === team.id;
+          const startDate = DATES.find(d => d.id === team.startDateId);
+
+          return (
+            <Card key={team.id} padding={0}>
+              <div
+                style={{
+                  padding: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  flexWrap: 'wrap',
+                  gap: 10,
+                }}
+                onClick={() => setExpandedTeam(isExpanded ? null : team.id)}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <ChevronDown size={18} style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>{team.name}</span>
+                    <Badge color="info">{team.criteria.length} معيار</Badge>
+                    <Badge color="accent">يبدأ {startDate?.label}</Badge>
+                  </div>
+                  <div style={{ fontSize: 12, color: THEME.colors.textTertiary, paddingRight: 26 }}>{team.description}</div>
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div style={{ padding: '0 16px 16px', borderTop: `1px solid ${THEME.colors.border}` }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 4 }}>تاريخ بدء العمل</label>
+                      <select
+                        value={team.startDateId}
+                        onChange={e => updateTeam(team.id, { startDateId: e.target.value })}
+                        style={{
+                          width: '100%', padding: '8px 12px', fontSize: 13,
+                          borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
+                          direction: 'rtl', outline: 'none', background: '#fff',
+                        }}
+                      >
+                        {DATES.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700 }}>المعايير ({team.criteria.length})</h3>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Button size="sm" variant="primary" icon={Plus} onClick={() => addCriterion(team.id)}>إضافة معيار</Button>
+                      <Button size="sm" variant="danger" icon={Trash2} onClick={() => deleteTeam(team.id)}>حذف الفريق</Button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                    {team.criteria.map((c, i) => (
+                      <div key={c.id} style={{
+                        padding: '10px 12px',
+                        background: THEME.colors.bgSecondary,
+                        borderRadius: THEME.radius.md,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        flexWrap: 'wrap',
+                      }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: THEME.colors.textTertiary, minWidth: 24 }}>{i + 1}.</span>
+                        <span style={{ flex: 1, fontSize: 13, minWidth: 200 }}>{c.name}</span>
+                        <Badge color={c.type === 'yesno' ? 'info' : c.type === 'scale' ? 'accent' : 'purple'} style={{ fontSize: 10 }}>
+                          {c.type === 'yesno' ? 'نعم/لا' : c.type === 'scale' ? 'تقييم 5' : `رقم (${c.unit || ''})`}
+                        </Badge>
+                        {c.repeat === 'first_day_only' && (
+                          <Badge color="warning" style={{ fontSize: 10 }}>أول يوم فقط</Badge>
+                        )}
+                        <Button size="sm" variant="outline" icon={Edit2} onClick={() => editCriterion(team.id, c)} />
+                        <Button size="sm" variant="danger" icon={Trash2} onClick={() => deleteCriterion(team.id, c.id)} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// =================================================================
+// Admin: Settings (Season Start Date)
+// =================================================================
+function SettingsPage({ settings, setSettings, toast }) {
+  const [tempDate, setTempDate] = useState(settings.seasonStartDate || '');
+
+  const saveSettings = () => {
+    if (!tempDate) {
+      toast.show('الرجاء تحديد تاريخ', 'warning');
+      return;
+    }
+    setSettings(prev => ({ ...prev, seasonStartDate: tempDate }));
+    toast.show('تم حفظ تاريخ بداية الموسم', 'success');
+  };
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>إعدادات النظام</h2>
+
+      <Card padding={20}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <Calendar size={20} color={THEME.colors.accent} strokeWidth={2} />
+          <h3 style={{ fontSize: 16, fontWeight: 700 }}>تاريخ بداية موسم ذي الحجة</h3>
+        </div>
+
+        <div style={{
+          padding: 12,
+          background: THEME.colors.infoSoft,
+          color: THEME.colors.info,
+          borderRadius: THEME.radius.md,
+          fontSize: 13,
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 8,
+        }}>
+          <Info size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div>
+            حدّد التاريخ الميلادي ليوم 1 من شهر ذي الحجة (وفقاً لرؤية الهلال). سيُحدّد هذا التاريخ تلقائياً اليوم الافتراضي عند فتح شاشة إدخال البيانات لكل مستخدم.
+          </div>
+        </div>
+
+        <Input
+          label="تاريخ 1 ذي الحجة (ميلادي)"
+          type="date"
+          value={tempDate}
+          onChange={e => setTempDate(e.target.value)}
+        />
+
+        {settings.seasonStartDate && (
+          <div style={{
+            marginTop: 12,
+            padding: 10,
+            background: THEME.colors.successSoft,
+            color: THEME.colors.success,
+            borderRadius: THEME.radius.md,
+            fontSize: 12,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <CheckCircle2 size={16} />
+            التاريخ الحالي المحفوظ: {new Date(settings.seasonStartDate).toLocaleDateString('ar-SA')}
+          </div>
+        )}
+
+        <Button variant="primary" icon={Save} onClick={saveSettings} fullWidth style={{ marginTop: 14 }}>
+          حفظ التاريخ
+        </Button>
+      </Card>
     </div>
   );
 }
@@ -832,14 +1484,21 @@ export default function App() {
   const { toasts, show } = useToast();
   const toast = { show };
 
+  const [users, setUsers] = useState(INITIAL_USERS);
+  const [teams, setTeams] = useState(INITIAL_TEAMS);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+
   const pages = useMemo(() => {
     if (!user) return [];
     const all = {
       dashboard: { id: 'dashboard', icon: LayoutDashboard, label: 'لوحة المتابعة' },
       entry: { id: 'entry', icon: ClipboardList, label: 'إدخال البيانات' },
+      users: { id: 'users', icon: UsersIcon, label: 'إدارة الحسابات' },
+      teamsAdmin: { id: 'teamsAdmin', icon: Settings, label: 'إدارة الفرق' },
+      settings: { id: 'settings', icon: Settings, label: 'إعدادات النظام' },
     };
     switch (user.role) {
-      case 'admin': return [all.dashboard, all.entry];
+      case 'admin': return [all.dashboard, all.entry, all.users, all.teamsAdmin, all.settings];
       case 'dashboard': return [all.dashboard];
       case 'data_entry': return [all.entry];
       default: return [];
@@ -848,13 +1507,13 @@ export default function App() {
 
   useEffect(() => {
     if (user && pages.length) setPage(pages[0].id);
-  }, [user, pages]);
+  }, [user]);
 
   if (!user) {
     return (
       <>
         <ToastContainer toasts={toasts} />
-        <LoginPage onLogin={setUser} toast={toast} />
+        <LoginPage onLogin={setUser} toast={toast} users={users} />
       </>
     );
   }
@@ -865,11 +1524,10 @@ export default function App() {
     <>
       <ToastContainer toasts={toasts} />
       <div style={{ minHeight: '100vh', background: THEME.colors.bg }}>
-        {/* Top Bar */}
         <div style={{
           background: THEME.colors.surface,
           borderBottom: `1px solid ${THEME.colors.border}`,
-          padding: '14px 20px',
+          padding: '12px 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -890,12 +1548,13 @@ export default function App() {
             >
               <Menu size={20} color={THEME.colors.primary} />
             </button>
-            <div>
-              <h1 style={{ fontSize: 17, fontWeight: 700, color: THEME.colors.primary }}>
+            <Logo height={36} />
+            <div style={{ borderRight: `1px solid ${THEME.colors.border}`, paddingRight: 12, marginRight: 4 }}>
+              <h1 style={{ fontSize: 15, fontWeight: 700, color: THEME.colors.primary }}>
                 {pages.find(p => p.id === page)?.label}
               </h1>
               {company && (
-                <p style={{ fontSize: 12, color: THEME.colors.textTertiary }}>
+                <p style={{ fontSize: 11, color: THEME.colors.textTertiary }}>
                   {company.name} — قسم {user.section}
                 </p>
               )}
@@ -919,7 +1578,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Sidebar */}
         {sidebarOpen && (
           <div
             onClick={() => setSidebarOpen(false)}
@@ -942,15 +1600,11 @@ export default function App() {
                 right: 0,
                 display: 'flex',
                 flexDirection: 'column',
-                animation: 'slideDown 0.2s',
               }}
             >
-              <div style={{ padding: 20, borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <Sparkles size={24} color={THEME.colors.accent} />
-                <div>
-                  <div style={{ fontWeight: 800 }}>إثراء التجربة</div>
-                  <div style={{ fontSize: 11, opacity: 0.6 }}>{user.name}</div>
-                </div>
+              <div style={{ padding: 20, borderBottom: '1px solid rgba(255,255,255,0.08)', background: '#fff' }}>
+                <Logo height={50} />
+                <div style={{ fontSize: 12, color: THEME.colors.textTertiary, marginTop: 6 }}>{user.name}</div>
               </div>
 
               <nav style={{ flex: 1, padding: '12px 0' }}>
@@ -974,6 +1628,7 @@ export default function App() {
                         fontSize: 14,
                         fontWeight: active ? 700 : 500,
                         textAlign: 'right',
+                        fontFamily: 'inherit',
                       }}
                     >
                       <Icon size={20} />
@@ -984,7 +1639,7 @@ export default function App() {
               </nav>
 
               <div style={{ padding: 18, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <Button variant="danger" fullWidth icon={LogOut} onClick={() => setUser(null)}>
+                <Button variant="danger" fullWidth icon={LogOut} onClick={() => { setUser(null); setSidebarOpen(false); }}>
                   تسجيل الخروج
                 </Button>
               </div>
@@ -993,8 +1648,11 @@ export default function App() {
         )}
 
         <main style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
-          {page === 'dashboard' && <DashboardPage />}
-          {page === 'entry' && <DataEntryPage user={user} toast={toast} />}
+          {page === 'dashboard' && <DashboardPage teams={teams} />}
+          {page === 'entry' && <DataEntryPage user={user} teams={teams} settings={settings} toast={toast} />}
+          {page === 'users' && <UsersPage users={users} setUsers={setUsers} toast={toast} />}
+          {page === 'teamsAdmin' && <TeamsManagementPage teams={teams} setTeams={setTeams} toast={toast} />}
+          {page === 'settings' && <SettingsPage settings={settings} setSettings={setSettings} toast={toast} />}
         </main>
       </div>
     </>
