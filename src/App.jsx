@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  AreaChart, Area, Cell,
+  AreaChart, Area, Cell, PieChart, Pie, Legend, RadarChart, Radar,
+  PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from 'recharts';
 import {
   LayoutDashboard, ClipboardList, Settings, LogOut, Menu, AlertTriangle,
@@ -11,7 +12,8 @@ import {
   ThumbsUp, ThumbsDown, HelpCircle, Check, Building2,
   TrendingUp, TrendingDown, Wifi, Recycle, Users as UsersIcon,
   Trash2, Edit2, Phone, Shield, Save, Hash, Eye, FileBarChart,
-  Filter, ChevronUp,
+  Filter, ChevronUp, Trophy, Target, Flame, Zap,
+  ArrowUp, ArrowDown, BarChart3, PieChart as PieChartIcon,
 } from 'lucide-react';
 
 import { Button } from './components/Button.jsx';
@@ -44,12 +46,9 @@ function useToast() {
 function ToastContainer({ toasts }) {
   const icons = { success: CheckCircle2, error: AlertTriangle, info: Info, warning: AlertCircle };
   const colors = {
-    success: THEME.colors.success,
-    error: THEME.colors.danger,
-    info: THEME.colors.info,
-    warning: THEME.colors.warning,
+    success: THEME.colors.success, error: THEME.colors.danger,
+    info: THEME.colors.info, warning: THEME.colors.warning,
   };
-
   return (
     <div style={{ position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none' }}>
       {toasts.map(t => {
@@ -73,7 +72,7 @@ function ToastContainer({ toasts }) {
 }
 
 // =================================================================
-// Login Page — اسم مستخدم فقط بدون كلمة مرور
+// Login Page
 // =================================================================
 function LoginPage({ onLogin, toast, users }) {
   const [username, setUsername] = useState('');
@@ -82,20 +81,13 @@ function LoginPage({ onLogin, toast, users }) {
 
   const handleSubmit = async () => {
     setError('');
-    if (!username.trim()) {
-      setError('الرجاء إدخال اسم المستخدم');
-      return;
-    }
+    if (!username.trim()) { setError('الرجاء إدخال اسم المستخدم'); return; }
     setLoading(true);
     await new Promise(r => setTimeout(r, 400));
     const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.active);
     setLoading(false);
-    if (!user) {
-      setError('اسم المستخدم غير صحيح أو الحساب معطّل');
-    } else {
-      toast.show(`مرحباً ${user.name}`, 'success');
-      onLogin(user);
-    }
+    if (!user) { setError('اسم المستخدم غير صحيح أو الحساب معطّل'); }
+    else { toast.show(`مرحباً ${user.name}`, 'success'); onLogin(user); }
   };
 
   return (
@@ -132,10 +124,8 @@ function LoginPage({ onLogin, toast, users }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Input
-            label="اسم المستخدم"
-            icon={User}
-            value={username}
-            onChange={e => setUsername(e.target.value)}
+            label="اسم المستخدم" icon={User}
+            value={username} onChange={e => setUsername(e.target.value)}
             placeholder="أدخل اسم المستخدم"
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
             autoFocus
@@ -150,284 +140,149 @@ function LoginPage({ onLogin, toast, users }) {
 }
 
 // =================================================================
-// Dashboard Page — لوحة المتابعة التفصيلية مع الفلاتر
+// Filter Chips Bar - شريط فلاتر دائم وظاهر
 // =================================================================
-function DashboardPage({ teams, companies, settings }) {
-  const [selectedCompanies, setSelectedCompanies] = useState([]);
-  const [selectedTeams, setSelectedTeams] = useState([]);
-  const [selectedSections, setSelectedSections] = useState([]);
-  const [showFilters, setShowFilters] = useState(false);
-
-  const activeCompanies = companies.filter(c => c.active);
-
-  // عند عدم اختيار شيء، يعتبر اختيار الكل
-  const filteredCompanies = selectedCompanies.length > 0 ? selectedCompanies : activeCompanies.map(c => c.id);
-  const filteredTeams = selectedTeams.length > 0 ? selectedTeams : teams.map(t => t.id);
-  const filteredSections = selectedSections.length > 0 ? selectedSections : ['رجال', 'نساء'];
-
+function FilterBar({ companies, teams, selectedCompanies, setSelectedCompanies, selectedTeams, setSelectedTeams, selectedSections, setSelectedSections }) {
   const toggle = (arr, setArr, value) => {
     setArr(arr.includes(value) ? arr.filter(x => x !== value) : [...arr, value]);
   };
 
-  // بيانات وهمية للعرض
-  const dailyTrend = DATES.map((d, i) => ({
-    day: d.id,
-    compliance: Math.round(75 + Math.sin(i * 0.7) * 8 + i * 1.5),
-    issues: Math.max(5, Math.round(18 - i * 1.2 + Math.sin(i * 1.5) * 3)),
-  }));
-
-  const teamPerf = teams
-    .filter(t => filteredTeams.includes(t.id))
-    .map(t => ({
-      name: t.name.replace('فريق ', '').replace('الفريق ', ''),
-      rate: Math.round(75 + Math.random() * 20),
-    }));
-
-  const companyPerf = activeCompanies
-    .filter(c => filteredCompanies.includes(c.id))
-    .map(c => ({
-      name: c.name.replace('شركة ', ''),
-      men: Math.round(70 + Math.random() * 25),
-      women: Math.round(70 + Math.random() * 25),
-    }));
-
-  const kpis = [
-    { icon: CheckCircle2, label: 'نسبة الامتثال', value: '87.3', unit: '%', trend: 'up', trendValue: '+3.2%', color: 'success' },
-    { icon: Award, label: 'متوسط الأداء', value: '4.2', unit: '/5', trend: 'up', trendValue: '+0.3', color: 'accent' },
-    { icon: Recycle, label: 'نفايات اليوم', value: '1,420', unit: 'كجم', trend: 'down', trendValue: '-12%', color: 'info' },
-    { icon: AlertTriangle, label: 'الملاحظات النشطة', value: '23', trend: 'down', trendValue: '-5', color: 'warning' },
-  ];
+  const activeCount = selectedCompanies.length + selectedTeams.length + selectedSections.length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Filters Panel */}
-      <Card padding={0}>
-        <div
-          style={{
-            padding: '14px 16px', display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', cursor: 'pointer',
-          }}
-          onClick={() => setShowFilters(v => !v)}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Filter size={18} color={THEME.colors.accent} />
-            <span style={{ fontSize: 14, fontWeight: 700 }}>فلاتر العرض</span>
-            {(selectedCompanies.length > 0 || selectedTeams.length > 0 || selectedSections.length > 0) && (
-              <Badge color="accent">
-                {selectedCompanies.length + selectedTeams.length + selectedSections.length} مفعّل
-              </Badge>
-            )}
-          </div>
-          {showFilters ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </div>
-
-        {showFilters && (
-          <div style={{ padding: 16, borderTop: `1px solid ${THEME.colors.border}`, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Companies Filter */}
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: THEME.colors.textSecondary }}>
-                الشركات ({selectedCompanies.length || 'الكل'})
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {activeCompanies.map(c => {
-                  const selected = selectedCompanies.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => toggle(selectedCompanies, setSelectedCompanies, c.id)}
-                      style={{
-                        padding: '6px 12px',
-                        background: selected ? THEME.colors.primary : THEME.colors.surface,
-                        color: selected ? '#fff' : THEME.colors.text,
-                        border: `1.5px solid ${selected ? THEME.colors.primary : THEME.colors.border}`,
-                        borderRadius: THEME.radius.full,
-                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      {selected && <Check size={12} style={{ display: 'inline', marginLeft: 4 }} />}
-                      {c.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Teams Filter */}
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: THEME.colors.textSecondary }}>
-                الفرق ({selectedTeams.length || 'الكل'})
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {teams.map(t => {
-                  const selected = selectedTeams.includes(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => toggle(selectedTeams, setSelectedTeams, t.id)}
-                      style={{
-                        padding: '6px 12px',
-                        background: selected ? THEME.colors.accent : THEME.colors.surface,
-                        color: selected ? '#fff' : THEME.colors.text,
-                        border: `1.5px solid ${selected ? THEME.colors.accent : THEME.colors.border}`,
-                        borderRadius: THEME.radius.full,
-                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      {selected && <Check size={12} style={{ display: 'inline', marginLeft: 4 }} />}
-                      {t.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Sections Filter */}
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: THEME.colors.textSecondary }}>
-                القسم ({selectedSections.length || 'الكل'})
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {['رجال', 'نساء'].map(s => {
-                  const selected = selectedSections.includes(s);
-                  return (
-                    <button
-                      key={s}
-                      onClick={() => toggle(selectedSections, setSelectedSections, s)}
-                      style={{
-                        padding: '6px 16px',
-                        background: selected ? THEME.colors.success : THEME.colors.surface,
-                        color: selected ? '#fff' : THEME.colors.text,
-                        border: `1.5px solid ${selected ? THEME.colors.success : THEME.colors.border}`,
-                        borderRadius: THEME.radius.full,
-                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      {selected && <Check size={12} style={{ display: 'inline', marginLeft: 4 }} />}
-                      {s}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {(selectedCompanies.length > 0 || selectedTeams.length > 0 || selectedSections.length > 0) && (
-              <Button
-                size="sm"
-                variant="outline"
-                icon={X}
-                onClick={() => {
-                  setSelectedCompanies([]);
-                  setSelectedTeams([]);
-                  setSelectedSections([]);
-                }}
-              >
-                مسح كل الفلاتر
-              </Button>
-            )}
-          </div>
+    <Card padding={16} style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <Filter size={18} color={THEME.colors.accent} />
+        <span style={{ fontSize: 14, fontWeight: 700 }}>الفلاتر</span>
+        {activeCount > 0 && (
+          <>
+            <Badge color="accent">{activeCount} مفعّل</Badge>
+            <button
+              onClick={() => { setSelectedCompanies([]); setSelectedTeams([]); setSelectedSections([]); }}
+              style={{
+                marginRight: 'auto', background: 'transparent',
+                border: 'none', color: THEME.colors.danger,
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              <X size={14} /> مسح الكل
+            </button>
+          </>
         )}
-      </Card>
-
-      {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-        {kpis.map((k, i) => <KPICard key={i} {...k} />)}
       </div>
 
-      {/* Trend Chart */}
-      <Card padding={20}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <Activity size={20} color={THEME.colors.accent} strokeWidth={2} />
-          <div style={{ fontSize: 15, fontWeight: 700 }}>الاتجاه اليومي للامتثال والملاحظات</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Sections */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: THEME.colors.textTertiary, minWidth: 50 }}>القسم:</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {['رجال', 'نساء'].map(s => {
+              const selected = selectedSections.includes(s);
+              return (
+                <button
+                  key={s}
+                  onClick={() => toggle(selectedSections, setSelectedSections, s)}
+                  style={{
+                    padding: '6px 14px',
+                    background: selected ? THEME.colors.success : THEME.colors.surface,
+                    color: selected ? '#fff' : THEME.colors.text,
+                    border: `1.5px solid ${selected ? THEME.colors.success : THEME.colors.border}`,
+                    borderRadius: THEME.radius.full,
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {selected && <Check size={12} style={{ display: 'inline', marginLeft: 4 }} />}
+                  {s}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <ResponsiveContainer width="100%" height={260}>
-          <AreaChart data={dailyTrend}>
-            <defs>
-              <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={THEME.colors.accent} stopOpacity={0.35} />
-                <stop offset="100%" stopColor={THEME.colors.accent} stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={THEME.colors.danger} stopOpacity={0.25} />
-                <stop offset="100%" stopColor={THEME.colors.danger} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke={THEME.colors.border} />
-            <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip contentStyle={{ background: '#fff', border: `1px solid ${THEME.colors.border}`, borderRadius: 10, fontSize: 12, direction: 'rtl' }} />
-            <Area type="monotone" dataKey="compliance" name="الامتثال %" stroke={THEME.colors.accent} strokeWidth={2.5} fill="url(#g1)" />
-            <Area type="monotone" dataKey="issues" name="الملاحظات" stroke={THEME.colors.danger} strokeWidth={2} fill="url(#g2)" />
-          </AreaChart>
-        </ResponsiveContainer>
-      </Card>
 
-      {/* Companies Comparison */}
-      {companyPerf.length > 0 && (
-        <Card padding={20}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <Building2 size={20} color={THEME.colors.primary} strokeWidth={2} />
-            <div style={{ fontSize: 15, fontWeight: 700 }}>مقارنة الشركات (رجال × نساء)</div>
+        {/* Companies */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: THEME.colors.textTertiary, minWidth: 50, paddingTop: 5 }}>الشركات:</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: 1 }}>
+            {companies.filter(c => c.active).map(c => {
+              const selected = selectedCompanies.includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => toggle(selectedCompanies, setSelectedCompanies, c.id)}
+                  style={{
+                    padding: '6px 12px',
+                    background: selected ? THEME.colors.primary : THEME.colors.surface,
+                    color: selected ? '#fff' : THEME.colors.text,
+                    border: `1.5px solid ${selected ? THEME.colors.primary : THEME.colors.border}`,
+                    borderRadius: THEME.radius.full,
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {selected && <Check size={12} style={{ display: 'inline', marginLeft: 4 }} />}
+                  {c.name}
+                </button>
+              );
+            })}
           </div>
-          <ResponsiveContainer width="100%" height={Math.max(220, companyPerf.length * 80)}>
-            <BarChart data={companyPerf} layout="vertical" margin={{ right: 10, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={THEME.colors.border} horizontal={false} />
-              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-              <YAxis dataKey="name" type="category" width={130} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={v => `${v}%`} contentStyle={{ direction: 'rtl' }} />
-              {filteredSections.includes('رجال') && <Bar dataKey="men" name="رجال" fill={THEME.colors.info} radius={[0, 4, 4, 0]} />}
-              {filteredSections.includes('نساء') && <Bar dataKey="women" name="نساء" fill={THEME.colors.accent} radius={[0, 4, 4, 0]} />}
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      )}
+        </div>
 
-      {/* Teams Performance */}
-      {teamPerf.length > 0 && (
-        <Card padding={20}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <UsersIcon size={20} color={THEME.colors.primary} strokeWidth={2} />
-            <div style={{ fontSize: 15, fontWeight: 700 }}>أداء الفرق</div>
+        {/* Teams */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: THEME.colors.textTertiary, minWidth: 50, paddingTop: 5 }}>الفرق:</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: 1 }}>
+            {teams.map(t => {
+              const selected = selectedTeams.includes(t.id);
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => toggle(selectedTeams, setSelectedTeams, t.id)}
+                  style={{
+                    padding: '6px 12px',
+                    background: selected ? THEME.colors.accent : THEME.colors.surface,
+                    color: selected ? '#fff' : THEME.colors.text,
+                    border: `1.5px solid ${selected ? THEME.colors.accent : THEME.colors.border}`,
+                    borderRadius: THEME.radius.full,
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {selected && <Check size={12} style={{ display: 'inline', marginLeft: 4 }} />}
+                  {t.name}
+                </button>
+              );
+            })}
           </div>
-          <ResponsiveContainer width="100%" height={Math.max(280, teamPerf.length * 35)}>
-            <BarChart data={teamPerf} layout="vertical" margin={{ right: 10, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={THEME.colors.border} horizontal={false} />
-              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-              <YAxis dataKey="name" type="category" width={130} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={v => `${v}%`} contentStyle={{ direction: 'rtl' }} />
-              <Bar dataKey="rate" radius={[0, 6, 6, 0]}>
-                {teamPerf.map((e, i) => (
-                  <Cell key={i} fill={e.rate >= 90 ? THEME.colors.success : e.rate >= 80 ? THEME.colors.accent : THEME.colors.warning} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      )}
-    </div>
+        </div>
+      </div>
+    </Card>
   );
 }
 
-function KPICard({ icon: Icon, label, value, unit, trend, trendValue, color = 'accent' }) {
+// =================================================================
+// KPI Card - مع رسم مصغر اختياري
+// =================================================================
+function KPICard({ icon: Icon, label, value, unit, trend, trendValue, color = 'accent', subtitle }) {
   const colors = {
     accent: { bg: '#FAF3E0', fg: THEME.colors.accent },
     success: { bg: THEME.colors.successSoft, fg: THEME.colors.success },
     warning: { bg: THEME.colors.warningSoft, fg: THEME.colors.warning },
     danger: { bg: THEME.colors.dangerSoft, fg: THEME.colors.danger },
     info: { bg: THEME.colors.infoSoft, fg: THEME.colors.info },
+    purple: { bg: THEME.colors.purpleSoft, fg: THEME.colors.purple },
   };
   const c = colors[color];
 
   return (
-    <Card padding={18}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+    <Card padding={16}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{
-          width: 44, height: 44, borderRadius: THEME.radius.md, background: c.bg,
+          width: 40, height: 40, borderRadius: THEME.radius.md, background: c.bg,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Icon size={22} color={c.fg} strokeWidth={2.2} />
+          <Icon size={20} color={c.fg} strokeWidth={2.2} />
         </div>
         {trend && (
           <div style={{
@@ -437,17 +292,373 @@ function KPICard({ icon: Icon, label, value, unit, trend, trendValue, color = 'a
             color: trend === 'up' ? THEME.colors.success : THEME.colors.danger,
             fontSize: 11, fontWeight: 700,
           }}>
-            {trend === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+            {trend === 'up' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
             {trendValue}
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
-        <span style={{ fontSize: 30, fontWeight: 800, lineHeight: 1 }}>{value}</span>
-        {unit && <span style={{ fontSize: 14, color: THEME.colors.textTertiary, fontWeight: 600 }}>{unit}</span>}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 2 }}>
+        <span style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, color: c.fg }}>{value}</span>
+        {unit && <span style={{ fontSize: 13, color: THEME.colors.textTertiary, fontWeight: 600 }}>{unit}</span>}
       </div>
-      <div style={{ fontSize: 13, color: THEME.colors.textSecondary, fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: 12, color: THEME.colors.textSecondary, fontWeight: 600 }}>{label}</div>
+      {subtitle && (
+        <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 2 }}>{subtitle}</div>
+      )}
     </Card>
+  );
+}
+
+// =================================================================
+// Dashboard Page - احترافية مع رسوم متعددة
+// =================================================================
+function DashboardPage({ teams, companies, settings }) {
+  const [selectedCompanies, setSelectedCompanies] = useState([]);
+  const [selectedTeams, setSelectedTeams] = useState([]);
+  const [selectedSections, setSelectedSections] = useState([]);
+
+  const activeCompanies = companies.filter(c => c.active);
+  const filteredCompanies = selectedCompanies.length > 0 ? activeCompanies.filter(c => selectedCompanies.includes(c.id)) : activeCompanies;
+  const filteredTeams = selectedTeams.length > 0 ? teams.filter(t => selectedTeams.includes(t.id)) : teams;
+  const filteredSections = selectedSections.length > 0 ? selectedSections : ['رجال', 'نساء'];
+
+  // بيانات وهمية للعرض - في الإنتاج تُحسب من evaluations الفعلية
+  const dailyTrend = DATES.map((d, i) => ({
+    day: d.id,
+    label: `${d.id} ذ.ح`,
+    compliance: Math.round(75 + Math.sin(i * 0.7) * 8 + i * 1.5),
+    issues: Math.max(5, Math.round(18 - i * 1.2 + Math.sin(i * 1.5) * 3)),
+  }));
+
+  const teamPerf = filteredTeams.map(t => ({
+    name: t.name.replace('فريق ', '').replace('الفريق ', ''),
+    rate: Math.round(70 + Math.random() * 28),
+    fullName: t.name,
+  })).sort((a, b) => b.rate - a.rate);
+
+  const topTeams = teamPerf.slice(0, 5);
+  const bottomTeams = teamPerf.slice(-5).reverse();
+
+  const companyPerf = filteredCompanies.map(c => ({
+    name: c.name.replace('شركة ', ''),
+    fullName: c.name,
+    men: Math.round(70 + Math.random() * 25),
+    women: Math.round(70 + Math.random() * 25),
+    overall: Math.round(70 + Math.random() * 25),
+  })).sort((a, b) => b.overall - a.overall);
+
+  // توزيع التقييمات
+  const scaleDistribution = [
+    { name: 'ممتاز', value: 145, color: SCALE_LABELS[5].color },
+    { name: 'جيد جداً', value: 98, color: SCALE_LABELS[4].color },
+    { name: 'جيد', value: 67, color: SCALE_LABELS[3].color },
+    { name: 'ضعيف', value: 23, color: SCALE_LABELS[2].color },
+    { name: 'ضعيف جداً', value: 8, color: SCALE_LABELS[1].color },
+  ];
+
+  // إجمالي التقييمات والمشاركة
+  const totalEvaluations = scaleDistribution.reduce((sum, s) => sum + s.value, 0);
+  const positiveRate = Math.round(((scaleDistribution[0].value + scaleDistribution[1].value) / totalEvaluations) * 100);
+  const negativeRate = Math.round(((scaleDistribution[3].value + scaleDistribution[4].value) / totalEvaluations) * 100);
+
+  // مقارنة الأقسام
+  const sectionComparison = [
+    { metric: 'الامتثال', men: 87, women: 91 },
+    { metric: 'الجودة', men: 82, women: 88 },
+    { metric: 'الانضباط', men: 89, women: 92 },
+    { metric: 'السرعة', men: 85, women: 80 },
+    { metric: 'النظافة', men: 78, women: 95 },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Filter Bar - دائماً ظاهرة */}
+      <FilterBar
+        companies={companies} teams={teams}
+        selectedCompanies={selectedCompanies} setSelectedCompanies={setSelectedCompanies}
+        selectedTeams={selectedTeams} setSelectedTeams={setSelectedTeams}
+        selectedSections={selectedSections} setSelectedSections={setSelectedSections}
+      />
+
+      {/* 6 KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <KPICard icon={CheckCircle2} label="نسبة الامتثال" value="87.3" unit="%" trend="up" trendValue="+3.2%" color="success" />
+        <KPICard icon={Award} label="متوسط الأداء" value="4.2" unit="/5" trend="up" trendValue="+0.3" color="accent" />
+        <KPICard icon={Activity} label="إنجاز اليوم" value="76" unit="%" trend="up" trendValue="+12%" color="info" subtitle="من إجمالي المعايير" />
+        <KPICard icon={UsersIcon} label="مدخلون نشطون" value="14" unit="من 18" color="purple" subtitle="آخر 24 ساعة" />
+        <KPICard icon={Recycle} label="نفايات اليوم" value="1,420" unit="كجم" trend="down" trendValue="-12%" color="info" />
+        <KPICard icon={AlertTriangle} label="ملاحظات سلبية" value="23" trend="down" trendValue="-5" color="warning" />
+      </div>
+
+      {/* Companies Comparison - الأهم */}
+      {companyPerf.length > 0 && (
+        <Card padding={20}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+            <Building2 size={20} color={THEME.colors.primary} strokeWidth={2} />
+            <div style={{ fontSize: 15, fontWeight: 700 }}>مقارنة الشركات</div>
+            <div style={{ fontSize: 11, color: THEME.colors.textTertiary, marginRight: 'auto' }}>
+              {filteredSections.length === 2 ? 'رجال × نساء' : `قسم ${filteredSections[0]}`}
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={Math.max(220, companyPerf.length * 70)}>
+            <BarChart data={companyPerf} layout="vertical" margin={{ right: 30, left: 10, top: 5, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={THEME.colors.border} horizontal={false} />
+              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
+              <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
+              <Tooltip formatter={v => `${v}%`} contentStyle={{ direction: 'rtl', borderRadius: 8 }} />
+              <Legend />
+              {filteredSections.includes('رجال') && (
+                <Bar dataKey="men" name="قسم الرجال" fill={THEME.colors.info} radius={[0, 4, 4, 0]} />
+              )}
+              {filteredSections.includes('نساء') && (
+                <Bar dataKey="women" name="قسم النساء" fill={THEME.colors.accent} radius={[0, 4, 4, 0]} />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Companies Leaderboard */}
+      {companyPerf.length > 0 && (
+        <Card padding={20}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <Trophy size={20} color={THEME.colors.accent} strokeWidth={2} />
+            <div style={{ fontSize: 15, fontWeight: 700 }}>ترتيب الشركات</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {companyPerf.map((c, i) => {
+              const medals = ['🥇', '🥈', '🥉'];
+              const isTop3 = i < 3;
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px',
+                  background: isTop3 ? '#FFFCF5' : THEME.colors.bgSecondary,
+                  border: isTop3 ? `1.5px solid ${THEME.colors.accent}33` : '1.5px solid transparent',
+                  borderRadius: THEME.radius.md,
+                }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: isTop3 ? THEME.colors.accent : THEME.colors.surface,
+                    color: isTop3 ? '#fff' : THEME.colors.text,
+                    border: isTop3 ? 'none' : `1.5px solid ${THEME.colors.border}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 800, fontSize: 14, flexShrink: 0,
+                  }}>
+                    {isTop3 ? medals[i] : `#${i + 1}`}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{c.fullName}</div>
+                    <div style={{
+                      height: 8, background: THEME.colors.bgSecondary,
+                      borderRadius: 4, overflow: 'hidden', position: 'relative',
+                    }}>
+                      <div style={{
+                        width: `${c.overall}%`, height: '100%',
+                        background: c.overall >= 90 ? THEME.colors.success : c.overall >= 80 ? THEME.colors.accent : THEME.colors.warning,
+                        borderRadius: 4,
+                      }} />
+                    </div>
+                  </div>
+                  <div style={{
+                    fontSize: 18, fontWeight: 800,
+                    color: c.overall >= 90 ? THEME.colors.success : c.overall >= 80 ? THEME.colors.accent : THEME.colors.warning,
+                    minWidth: 50, textAlign: 'left',
+                  }}>
+                    {c.overall}%
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* Section Comparison */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 16 }}>
+        {/* Section Radar Chart */}
+        <Card padding={20}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <Target size={20} color={THEME.colors.primary} strokeWidth={2} />
+            <div style={{ fontSize: 15, fontWeight: 700 }}>مقارنة قسم الرجال × النساء</div>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <RadarChart data={sectionComparison}>
+              <PolarGrid stroke={THEME.colors.border} />
+              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
+              <PolarRadiusAxis tick={{ fontSize: 10 }} angle={90} domain={[0, 100]} />
+              {filteredSections.includes('رجال') && (
+                <Radar name="رجال" dataKey="men" stroke={THEME.colors.info} fill={THEME.colors.info} fillOpacity={0.3} />
+              )}
+              {filteredSections.includes('نساء') && (
+                <Radar name="نساء" dataKey="women" stroke={THEME.colors.accent} fill={THEME.colors.accent} fillOpacity={0.3} />
+              )}
+              <Legend />
+              <Tooltip contentStyle={{ direction: 'rtl', borderRadius: 8 }} />
+            </RadarChart>
+          </ResponsiveContainer>
+        </Card>
+
+        {/* Scale Distribution Pie */}
+        <Card padding={20}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <PieChartIcon size={20} color={THEME.colors.accent} strokeWidth={2} />
+            <div style={{ fontSize: 15, fontWeight: 700 }}>توزيع التقييمات</div>
+          </div>
+          <ResponsiveContainer width="100%" height={250}>
+            <PieChart>
+              <Pie
+                data={scaleDistribution}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={85}
+                innerRadius={50}
+                paddingAngle={2}
+              >
+                {scaleDistribution.map((entry, i) => (
+                  <Cell key={i} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ direction: 'rtl', borderRadius: 8, fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+            {scaleDistribution.map((s, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                fontSize: 12, color: THEME.colors.textSecondary,
+              }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>{s.name}</span>
+                <span style={{ fontWeight: 700, color: s.color }}>
+                  {s.value} ({Math.round(s.value / totalEvaluations * 100)}%)
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            marginTop: 12, padding: 10, background: THEME.colors.successSoft,
+            color: THEME.colors.success, borderRadius: THEME.radius.md,
+            fontSize: 12, fontWeight: 700, textAlign: 'center',
+          }}>
+            ✨ نسبة التقييمات الإيجابية: {positiveRate}%
+          </div>
+        </Card>
+      </div>
+
+      {/* Trend Chart */}
+      <Card padding={20}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <Activity size={20} color={THEME.colors.accent} strokeWidth={2} />
+          <div style={{ fontSize: 15, fontWeight: 700 }}>الاتجاه اليومي خلال الموسم</div>
+        </div>
+        <ResponsiveContainer width="100%" height={280}>
+          <AreaChart data={dailyTrend}>
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={THEME.colors.accent} stopOpacity={0.4} />
+                <stop offset="100%" stopColor={THEME.colors.accent} stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={THEME.colors.danger} stopOpacity={0.3} />
+                <stop offset="100%" stopColor={THEME.colors.danger} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke={THEME.colors.border} />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip contentStyle={{ direction: 'rtl', borderRadius: 8 }} />
+            <Legend />
+            <Area type="monotone" dataKey="compliance" name="الامتثال %" stroke={THEME.colors.accent} strokeWidth={2.5} fill="url(#g1)" />
+            <Area type="monotone" dataKey="issues" name="الملاحظات" stroke={THEME.colors.danger} strokeWidth={2} fill="url(#g2)" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Top & Bottom Teams */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 16 }}>
+        {/* Top 5 Teams */}
+        <Card padding={20}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <Flame size={20} color={THEME.colors.success} strokeWidth={2} />
+            <div style={{ fontSize: 15, fontWeight: 700 }}>أفضل 5 فرق أداءً</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {topTeams.map((t, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 12px',
+                background: i === 0 ? THEME.colors.successSoft : THEME.colors.bgSecondary,
+                borderRadius: THEME.radius.md,
+              }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: i === 0 ? THEME.colors.success : THEME.colors.surface,
+                  color: i === 0 ? '#fff' : THEME.colors.text,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: 12, flexShrink: 0,
+                }}>{i + 1}</div>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{t.fullName}</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: THEME.colors.success }}>{t.rate}%</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Bottom 5 Teams */}
+        <Card padding={20}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <AlertTriangle size={20} color={THEME.colors.warning} strokeWidth={2} />
+            <div style={{ fontSize: 15, fontWeight: 700 }}>فرق تحتاج تحسيناً</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {bottomTeams.map((t, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 12px',
+                background: i === 0 ? THEME.colors.warningSoft : THEME.colors.bgSecondary,
+                borderRadius: THEME.radius.md,
+              }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: i === 0 ? THEME.colors.warning : THEME.colors.surface,
+                  color: i === 0 ? '#fff' : THEME.colors.text,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: 12, flexShrink: 0,
+                }}>!</div>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{t.fullName}</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: THEME.colors.warning }}>{t.rate}%</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {/* All Teams Performance */}
+      {teamPerf.length > 0 && (
+        <Card padding={20}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <BarChart3 size={20} color={THEME.colors.primary} strokeWidth={2} />
+            <div style={{ fontSize: 15, fontWeight: 700 }}>أداء كل الفرق</div>
+          </div>
+          <ResponsiveContainer width="100%" height={Math.max(280, teamPerf.length * 35)}>
+            <BarChart data={teamPerf} layout="vertical" margin={{ right: 30, left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={THEME.colors.border} horizontal={false} />
+              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
+              <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} />
+              <Tooltip formatter={v => `${v}%`} contentStyle={{ direction: 'rtl', borderRadius: 8 }} />
+              <Bar dataKey="rate" radius={[0, 6, 6, 0]}>
+                {teamPerf.map((e, i) => (
+                  <Cell key={i} fill={e.rate >= 90 ? THEME.colors.success : e.rate >= 80 ? THEME.colors.accent : e.rate >= 70 ? THEME.colors.warning : THEME.colors.danger} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+    </div>
   );
 }
 
@@ -467,10 +678,7 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
           const Icon = o.icon;
           const isSelected = value === o.val;
           return (
-            <button
-              key={o.val}
-              onClick={() => !disabled && onChange(o.val)}
-              disabled={disabled}
+            <button key={o.val} onClick={() => !disabled && onChange(o.val)} disabled={disabled}
               style={{
                 flex: '1 1 100px', minHeight: 52, padding: '10px 14px',
                 background: isSelected ? o.bg : THEME.colors.surface,
@@ -480,8 +688,7 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 gap: 8, opacity: disabled ? 0.5 : 1, fontFamily: 'inherit',
                 cursor: disabled ? 'not-allowed' : 'pointer',
-              }}
-            >
+              }}>
               <Icon size={18} strokeWidth={2.4} />
               {o.label}
             </button>
@@ -498,10 +705,7 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
           const isSelected = value === n;
           const sl = SCALE_LABELS[n];
           return (
-            <button
-              key={n}
-              onClick={() => !disabled && onChange(n)}
-              disabled={disabled}
+            <button key={n} onClick={() => !disabled && onChange(n)} disabled={disabled}
               style={{
                 minHeight: 76,
                 background: isSelected ? sl.bg : THEME.colors.surface,
@@ -511,8 +715,7 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
                 alignItems: 'center', justifyContent: 'center', gap: 4,
                 opacity: disabled ? 0.5 : 1, fontFamily: 'inherit',
                 cursor: disabled ? 'not-allowed' : 'pointer',
-              }}
-            >
+              }}>
               <div style={{ fontSize: 24, fontWeight: 800, color: isSelected ? sl.color : THEME.colors.textTertiary, lineHeight: 1 }}>{n}</div>
               <div style={{ fontSize: 11, fontWeight: 700, color: isSelected ? sl.color : THEME.colors.textSecondary, textAlign: 'center', lineHeight: 1.2 }}>
                 {sl.text}
@@ -520,9 +723,7 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
             </button>
           );
         })}
-        <button
-          onClick={() => !disabled && onChange('na')}
-          disabled={disabled}
+        <button onClick={() => !disabled && onChange('na')} disabled={disabled}
           style={{
             minHeight: 76, padding: '6px 10px',
             background: value === 'na' ? THEME.colors.bgSecondary : THEME.colors.surface,
@@ -532,8 +733,7 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', gap: 4,
             cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-          }}
-        >
+          }}>
           <HelpCircle size={20} />
           <span style={{ fontSize: 10 }}>غير منطبق</span>
         </button>
@@ -544,28 +744,22 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
   if (criterion.type === 'number') {
     return (
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input
-          type="number"
-          value={value ?? ''}
+        <input type="number" value={value ?? ''}
           onChange={e => !disabled && onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
-          disabled={disabled}
-          placeholder="أدخل الرقم..."
+          disabled={disabled} placeholder="أدخل الرقم..."
           style={{
             flex: 1, padding: '12px 16px', fontSize: 16, fontWeight: 700,
             borderRadius: THEME.radius.md,
             border: `2px solid ${THEME.colors.border}`,
             outline: 'none', direction: 'rtl', minHeight: 56, boxSizing: 'border-box',
-          }}
-        />
+          }}/>
         {criterion.unit && (
           <div style={{
             padding: '12px 18px', background: THEME.colors.bgSecondary,
             color: THEME.colors.textSecondary, borderRadius: THEME.radius.md,
             fontSize: 14, fontWeight: 700, minHeight: 56,
             display: 'flex', alignItems: 'center',
-          }}>
-            {criterion.unit}
-          </div>
+          }}>{criterion.unit}</div>
         )}
       </div>
     );
@@ -603,24 +797,15 @@ function CriterionCard({ criterion, index, value, note, onValueChange, onNoteCha
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.5, marginBottom: 4 }}>{criterion.name}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <Badge color={
-              criterion.type === 'yesno' ? 'info' :
-              criterion.type === 'scale' ? 'accent' :
-              criterion.type === 'number' ? 'purple' : 'gray'
-            } style={{ fontSize: 10 }}>
-              {criterion.type === 'yesno' ? 'نعم / لا' :
-               criterion.type === 'scale' ? 'تقييم من 5' :
-               criterion.type === 'number' ? `رقم (${criterion.unit || 'وحدة'})` : 'نص'}
+            <Badge color={criterion.type === 'yesno' ? 'info' : criterion.type === 'scale' ? 'accent' : criterion.type === 'number' ? 'purple' : 'gray'} style={{ fontSize: 10 }}>
+              {criterion.type === 'yesno' ? 'نعم / لا' : criterion.type === 'scale' ? 'تقييم من 5' : criterion.type === 'number' ? `رقم (${criterion.unit || 'وحدة'})` : 'نص'}
             </Badge>
             {criterion.noteRequired === 'always' && (
               <Badge color="warning" style={{ fontSize: 10 }}>
-                <MessageSquare size={11} />
-                ملاحظة إلزامية
+                <MessageSquare size={11} />ملاحظة إلزامية
               </Badge>
             )}
-            {criterion.repeat === 'first_day_only' && (
-              <Badge color="info" style={{ fontSize: 10 }}>أول يوم فقط</Badge>
-            )}
+            {criterion.repeat === 'first_day_only' && <Badge color="info" style={{ fontSize: 10 }}>أول يوم فقط</Badge>}
           </div>
         </div>
       </div>
@@ -634,10 +819,7 @@ function CriterionCard({ criterion, index, value, note, onValueChange, onNoteCha
             ملاحظة {noteRequired && <span style={{ color: THEME.colors.danger }}>*</span>}
             {noteMissing && <span style={{ fontSize: 11, marginRight: 'auto' }}>(مطلوبة)</span>}
           </label>
-          <textarea
-            value={note || ''}
-            onChange={e => onNoteChange(e.target.value)}
-            disabled={disabled}
+          <textarea value={note || ''} onChange={e => onNoteChange(e.target.value)} disabled={disabled}
             placeholder={isNA ? 'اذكر سبب عدم انطباق هذا المعيار...' : isNegative ? 'اشرح سبب التقييم السلبي...' : 'أضف ملاحظة (اختياري)...'}
             rows={2}
             style={{
@@ -646,8 +828,7 @@ function CriterionCard({ criterion, index, value, note, onValueChange, onNoteCha
               border: `1.5px solid ${noteMissing ? THEME.colors.warning : THEME.colors.border}`,
               fontSize: 13, direction: 'rtl', outline: 'none',
               resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit',
-            }}
-          />
+            }}/>
         </div>
       )}
     </div>
@@ -655,7 +836,7 @@ function CriterionCard({ criterion, index, value, note, onValueChange, onNoteCha
 }
 
 // =================================================================
-// Data Entry Page — مع التاريخ الميلادي
+// Data Entry Page
 // =================================================================
 function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluations }) {
   const todayId = useMemo(() => getDefaultDateId(settings.seasonStartDate), [settings.seasonStartDate]);
@@ -663,9 +844,7 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
   const [activeTeamId, setActiveTeamId] = useState(teams[0]?.id);
   const [savedIndicator, setSavedIndicator] = useState(false);
 
-  useEffect(() => {
-    setActiveDate(todayId);
-  }, [todayId]);
+  useEffect(() => { setActiveDate(todayId); }, [todayId]);
 
   const activeTeam = teams.find(t => t.id === activeTeamId);
   const activeIdx = DATES.findIndex(d => d.id === activeDate);
@@ -686,10 +865,7 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
   }, []);
 
   const updateValue = useCallback((criterionId, val) => {
-    if (isLocked) {
-      toast.show('لا يمكن التعديل على يوم مستقبلي', 'warning');
-      return;
-    }
+    if (isLocked) { toast.show('لا يمكن التعديل على يوم مستقبلي', 'warning'); return; }
     const key = getKey(criterionId);
     setEvaluations(prev => ({
       ...prev,
@@ -737,7 +913,6 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
 
   const currentProgress = progressMap[activeTeamId] || { filled: 0, total: 0 };
 
-  // التاريخ الميلادي لليوم الحالي
   const gregorianDate = useMemo(() => {
     return getGregorianDateForHijriDay(activeDate, settings.seasonStartDate);
   }, [activeDate, settings.seasonStartDate]);
@@ -748,7 +923,7 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
         <Card padding={14} style={{ marginBottom: 14, background: THEME.colors.warningSoft, border: `1.5px solid ${THEME.colors.warning}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: THEME.colors.warning, fontSize: 13, fontWeight: 600 }}>
             <AlertTriangle size={18} />
-            لم يُحدَّد تاريخ بداية موسم ذي الحجة بعد. يرجى من مدير النظام تحديده من الإعدادات.
+            لم يُحدَّد تاريخ بداية موسم ذي الحجة بعد. يرجى من مدير النظام تحديده.
           </div>
         </Card>
       )}
@@ -757,8 +932,7 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Button size="sm" variant="outline" icon={ChevronRight}
             onClick={() => activeIdx > 0 && setActiveDate(DATES[activeIdx - 1].id)}
-            disabled={activeIdx === 0}
-          />
+            disabled={activeIdx === 0}/>
           <div style={{
             flex: 1, padding: '10px 14px',
             background: isLocked ? THEME.colors.dangerSoft : THEME.colors.bgSecondary,
@@ -782,8 +956,7 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
           </div>
           <Button size="sm" variant="outline" icon={ChevronLeft}
             onClick={() => activeIdx < DATES.length - 1 && setActiveDate(DATES[activeIdx + 1].id)}
-            disabled={activeIdx === DATES.length - 1}
-          />
+            disabled={activeIdx === DATES.length - 1}/>
         </div>
       </Card>
 
@@ -795,9 +968,7 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
 
           if (progress.inactive) {
             return (
-              <button
-                key={t.id}
-                onClick={() => setActiveTeamId(t.id)}
+              <button key={t.id} onClick={() => setActiveTeamId(t.id)}
                 style={{
                   padding: '12px 14px',
                   background: isActive ? THEME.colors.bgSecondary : 'transparent',
@@ -806,8 +977,7 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
                   borderRadius: THEME.radius.md,
                   textAlign: 'right', minHeight: 76,
                   cursor: 'pointer', opacity: 0.6, fontFamily: 'inherit',
-                }}
-              >
+                }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{t.name}</div>
                 <div style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Lock size={11} />
@@ -818,9 +988,7 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
           }
 
           return (
-            <button
-              key={t.id}
-              onClick={() => setActiveTeamId(t.id)}
+            <button key={t.id} onClick={() => setActiveTeamId(t.id)}
               style={{
                 padding: '12px 14px',
                 background: isActive ? THEME.colors.primary : THEME.colors.surface,
@@ -829,8 +997,7 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
                 borderRadius: THEME.radius.md,
                 textAlign: 'right', minHeight: 76, fontFamily: 'inherit',
                 cursor: 'pointer',
-              }}
-            >
+              }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 700 }}>{t.name}</span>
                 {pct === 100 && progress.total > 0 && <CheckCircle2 size={16} color={isActive ? '#90E0B5' : THEME.colors.success} />}
@@ -879,24 +1046,14 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
         </Card>
       )}
 
-      {teamActive && visibleCriteria.length === 0 && (
-        <Card padding={20} style={{ textAlign: 'center' }}>
-          <Info size={32} color={THEME.colors.info} style={{ margin: '0 auto 10px' }} />
-          <div style={{ fontSize: 14, fontWeight: 700 }}>لا توجد معايير للتعبئة في هذا اليوم</div>
-        </Card>
-      )}
-
       {teamActive && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 20 }}>
           {visibleCriteria.map((c, i) => {
             const e = evaluations[`${user.companyId}_${user.section}_${activeDate}_${c.id}`];
             return (
               <CriterionCard
-                key={c.id}
-                criterion={c}
-                index={i}
-                value={e?.value}
-                note={e?.note}
+                key={c.id} criterion={c} index={i}
+                value={e?.value} note={e?.note}
                 onValueChange={(v) => updateValue(c.id, v)}
                 onNoteChange={(n) => updateNote(c.id, n)}
                 disabled={isLocked}
@@ -910,23 +1067,19 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, setEvaluatio
 }
 
 // =================================================================
-// Supervisor Page — صفحة مشرف المتابعة
+// Supervisor Page
 // =================================================================
 function SupervisorPage({ user, users, companies, teams, evaluations, settings, toast }) {
   const todayId = useMemo(() => getDefaultDateId(settings.seasonStartDate), [settings.seasonStartDate]);
   const [activeDate, setActiveDate] = useState(todayId);
 
-  // المدخلون التابعون لقسم هذا المشرف
   const myEntries = users.filter(u =>
-    u.role === 'data_entry' &&
-    u.section === user.section &&
-    u.active
+    u.role === 'data_entry' && u.section === user.section && u.active
   );
 
   const activeIdx = DATES.findIndex(d => d.id === activeDate);
   const gregorianDate = getGregorianDateForHijriDay(activeDate, settings.seasonStartDate);
 
-  // إحصائيات اليوم لكل مدخل
   const entryStats = myEntries.map(entry => {
     const company = companies.find(c => c.id === entry.companyId);
     let totalCriteria = 0;
@@ -943,22 +1096,18 @@ function SupervisorPage({ user, users, companies, teams, evaluations, settings, 
         const e = evaluations[key];
         if (e?.value !== undefined && e?.value !== null && e?.value !== '') {
           filledCriteria++;
-          if (e.value === 'no' || (typeof e.value === 'number' && c.type === 'scale' && e.value < 3)) {
-            negatives++;
-          }
+          if (e.value === 'no' || (typeof e.value === 'number' && c.type === 'scale' && e.value < 3)) negatives++;
           if (e.note?.trim()) notes++;
         }
       });
     });
 
     return {
-      entry, company,
-      totalCriteria, filledCriteria, negatives, notes,
+      entry, company, totalCriteria, filledCriteria, negatives, notes,
       completion: totalCriteria > 0 ? Math.round((filledCriteria / totalCriteria) * 100) : 0,
     };
   });
 
-  // الإجماليات
   const totals = entryStats.reduce((acc, s) => ({
     totalCriteria: acc.totalCriteria + s.totalCriteria,
     filledCriteria: acc.filledCriteria + s.filledCriteria,
@@ -967,12 +1116,9 @@ function SupervisorPage({ user, users, companies, teams, evaluations, settings, 
   }), { totalCriteria: 0, filledCriteria: 0, negatives: 0, notes: 0 });
 
   const overallCompletion = totals.totalCriteria > 0
-    ? Math.round((totals.filledCriteria / totals.totalCriteria) * 100)
-    : 0;
+    ? Math.round((totals.filledCriteria / totals.totalCriteria) * 100) : 0;
 
-  const generateReport = () => {
-    toast.show('تم إصدار التقرير اليومي (ميزة كاملة قيد التطوير)', 'info');
-  };
+  const generateReport = () => toast.show('تم إصدار التقرير اليومي (ميزة كاملة قيد التطوير)', 'info');
 
   return (
     <div>
@@ -980,8 +1126,7 @@ function SupervisorPage({ user, users, companies, teams, evaluations, settings, 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Button size="sm" variant="outline" icon={ChevronRight}
             onClick={() => activeIdx > 0 && setActiveDate(DATES[activeIdx - 1].id)}
-            disabled={activeIdx === 0}
-          />
+            disabled={activeIdx === 0}/>
           <div style={{ flex: 1, padding: '10px 14px', background: THEME.colors.bgSecondary, borderRadius: THEME.radius.md, textAlign: 'center' }}>
             <div style={{ fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
               <Calendar size={16} />
@@ -995,12 +1140,10 @@ function SupervisorPage({ user, users, companies, teams, evaluations, settings, 
           </div>
           <Button size="sm" variant="outline" icon={ChevronLeft}
             onClick={() => activeIdx < DATES.length - 1 && setActiveDate(DATES[activeIdx + 1].id)}
-            disabled={activeIdx === DATES.length - 1}
-          />
+            disabled={activeIdx === DATES.length - 1}/>
         </div>
       </Card>
 
-      {/* KPIs لليوم */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
         <KPICard icon={UsersIcon} label={`مدخلو قسم ${user.section}`} value={myEntries.length} color="info" />
         <KPICard icon={CheckCircle2} label="نسبة الإنجاز اليوم" value={overallCompletion} unit="%" color="success" />
@@ -1008,7 +1151,6 @@ function SupervisorPage({ user, users, companies, teams, evaluations, settings, 
         <KPICard icon={MessageSquare} label="ملاحظات اليوم" value={totals.notes} color="accent" />
       </div>
 
-      {/* Report Button */}
       <Card padding={16} style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div>
@@ -1023,20 +1165,14 @@ function SupervisorPage({ user, users, companies, teams, evaluations, settings, 
         </div>
       </Card>
 
-      {/* قائمة مدخلي البيانات */}
-      <div style={{ marginBottom: 10 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
-          متابعة مدخلي البيانات ({myEntries.length})
-        </h3>
-      </div>
+      <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
+        متابعة مدخلي البيانات ({myEntries.length})
+      </h3>
 
       {entryStats.length === 0 ? (
         <Card padding={30} style={{ textAlign: 'center' }}>
           <Info size={32} color={THEME.colors.textTertiary} style={{ margin: '0 auto 10px' }} />
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>لا يوجد مدخلون في قسم {user.section}</div>
-          <div style={{ fontSize: 12, color: THEME.colors.textTertiary }}>
-            يجب على مدير النظام إضافة مدخلي بيانات لهذا القسم أولاً
-          </div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>لا يوجد مدخلون في قسم {user.section}</div>
         </Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1048,15 +1184,11 @@ function SupervisorPage({ user, users, companies, teams, evaluations, settings, 
                   background: THEME.colors.accent, color: '#fff',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontWeight: 700, fontSize: 18, flexShrink: 0,
-                }}>
-                  {s.entry.name.charAt(0)}
-                </div>
+                }}>{s.entry.name.charAt(0)}</div>
                 <div style={{ flex: 1, minWidth: 200 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{s.entry.name}</div>
                   <div style={{ fontSize: 12, color: THEME.colors.textSecondary, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                    {s.company && (
-                      <span><Building2 size={11} style={{ display: 'inline', marginLeft: 4 }} />{s.company.name}</span>
-                    )}
+                    {s.company && <span><Building2 size={11} style={{ display: 'inline', marginLeft: 4 }} />{s.company.name}</span>}
                     <span><User size={11} style={{ display: 'inline', marginLeft: 4 }} />{s.entry.username}</span>
                   </div>
                 </div>
@@ -1071,9 +1203,7 @@ function SupervisorPage({ user, users, companies, teams, evaluations, settings, 
                     <div style={{ fontSize: 16, fontWeight: 700 }}>{s.filledCriteria}/{s.totalCriteria}</div>
                     <div style={{ fontSize: 10, color: THEME.colors.textTertiary }}>معايير</div>
                   </div>
-                  {s.negatives > 0 && (
-                    <Badge color="danger">{s.negatives} سلبي</Badge>
-                  )}
+                  {s.negatives > 0 && <Badge color="danger">{s.negatives} سلبي</Badge>}
                 </div>
               </div>
             </Card>
@@ -1085,7 +1215,7 @@ function SupervisorPage({ user, users, companies, teams, evaluations, settings, 
 }
 
 // =================================================================
-// Admin: Users Management — مع 4 صلاحيات بدون كلمة مرور
+// Users Management
 // =================================================================
 function UsersPage({ users, setUsers, companies, toast }) {
   const [showForm, setShowForm] = useState(false);
@@ -1105,39 +1235,20 @@ function UsersPage({ users, setUsers, companies, toast }) {
     setShowForm(true);
   };
 
-  const openEdit = (u) => {
-    setEditing(u);
-    setForm({ ...u });
-    setShowForm(true);
-  };
+  const openEdit = (u) => { setEditing(u); setForm({ ...u }); setShowForm(true); };
 
-  const validateUsername = (username) => {
-    // حروف إنجليزية أو أرقام أو الاثنين
-    return /^[a-zA-Z0-9_]+$/.test(username);
-  };
+  const validateUsername = (username) => /^[a-zA-Z0-9_]+$/.test(username);
 
   const save = () => {
-    if (!form.name || !form.username) {
-      toast.show('الاسم واسم المستخدم مطلوبان', 'warning');
-      return;
-    }
-    if (!validateUsername(form.username)) {
-      toast.show('اسم المستخدم يجب أن يحتوي على حروف إنجليزية وأرقام فقط', 'warning');
-      return;
-    }
+    if (!form.name || !form.username) { toast.show('الاسم واسم المستخدم مطلوبان', 'warning'); return; }
+    if (!validateUsername(form.username)) { toast.show('اسم المستخدم: حروف إنجليزية وأرقام فقط', 'warning'); return; }
     const dup = users.find(u => u.username.toLowerCase() === form.username.toLowerCase() && u.id !== editing?.id);
-    if (dup) {
-      toast.show('اسم المستخدم مستخدم مسبقاً', 'warning');
-      return;
-    }
+    if (dup) { toast.show('اسم المستخدم مستخدم مسبقاً', 'warning'); return; }
 
-    // ضبط الحقول حسب الصلاحية
     let finalForm = { ...form };
     if (form.role === 'admin' || form.role === 'dashboard') {
-      finalForm.companyId = null;
-      finalForm.section = null;
+      finalForm.companyId = null; finalForm.section = null;
     } else if (form.role === 'supervisor') {
-      // مشرف المتابعة: يحدد القسم فقط، بدون شركة
       finalForm.companyId = null;
     }
 
@@ -1152,21 +1263,15 @@ function UsersPage({ users, setUsers, companies, toast }) {
   };
 
   const remove = (u) => {
-    if (u.username === 's123') {
-      toast.show('لا يمكن حذف حساب المدير الرئيسي', 'warning');
-      return;
-    }
-    if (confirm(`هل أنت متأكد من حذف ${u.name}؟`)) {
+    if (u.username === 's123') { toast.show('لا يمكن حذف المدير الرئيسي', 'warning'); return; }
+    if (confirm(`حذف ${u.name}؟`)) {
       setUsers(prev => prev.filter(x => x.id !== u.id));
       toast.show('تم حذف الحساب', 'info');
     }
   };
 
   const toggleActive = (u) => {
-    if (u.username === 's123') {
-      toast.show('لا يمكن تعطيل حساب المدير الرئيسي', 'warning');
-      return;
-    }
+    if (u.username === 's123') { toast.show('لا يمكن تعطيل المدير الرئيسي', 'warning'); return; }
     setUsers(prev => prev.map(x => x.id === u.id ? { ...x, active: !x.active } : x));
     toast.show(u.active ? 'تم تعطيل الحساب' : 'تم تفعيل الحساب', 'info');
   };
@@ -1186,28 +1291,22 @@ function UsersPage({ users, setUsers, companies, toast }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Input label="الاسم الكامل" icon={User} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="مثلاً: أحمد محمد" />
-          <Input
-            label="اسم المستخدم"
-            icon={User}
+          <Input label="اسم المستخدم" icon={User}
             value={form.username}
             onChange={e => setForm(p => ({ ...p, username: e.target.value.toLowerCase() }))}
-            placeholder="حروف إنجليزية أو أرقام (مثال: ahmed أو 123 أو ahmed123)"
-            hint="بدون كلمة مرور — يدخل المستخدم بهذا الاسم فقط"
-          />
+            placeholder="حروف إنجليزية أو أرقام"
+            hint="بدون كلمة مرور — يدخل المستخدم بهذا الاسم فقط"/>
           <Input label="رقم الجوال (اختياري)" icon={Phone} value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="05XXXXXXXX" />
 
           <div>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>الصلاحية</label>
-            <select
-              value={form.role}
-              onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
+            <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
               style={{
                 width: '100%', padding: '12px 14px', fontSize: 15,
                 borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
                 direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff',
                 fontFamily: 'inherit',
-              }}
-            >
+              }}>
               <option value="admin">مدير النظام</option>
               <option value="dashboard">عرض لوحة المتابعة (للإدارة العليا)</option>
               <option value="data_entry">مدخل بيانات</option>
@@ -1222,31 +1321,25 @@ function UsersPage({ users, setUsers, companies, toast }) {
             <>
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>الشركة</label>
-                <select
-                  value={form.companyId}
-                  onChange={e => setForm(p => ({ ...p, companyId: e.target.value }))}
+                <select value={form.companyId} onChange={e => setForm(p => ({ ...p, companyId: e.target.value }))}
                   style={{
                     width: '100%', padding: '12px 14px', fontSize: 15,
                     borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
                     direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff',
                     fontFamily: 'inherit',
-                  }}
-                >
+                  }}>
                   {companies.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>القسم</label>
-                <select
-                  value={form.section}
-                  onChange={e => setForm(p => ({ ...p, section: e.target.value }))}
+                <select value={form.section} onChange={e => setForm(p => ({ ...p, section: e.target.value }))}
                   style={{
                     width: '100%', padding: '12px 14px', fontSize: 15,
                     borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
                     direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff',
                     fontFamily: 'inherit',
-                  }}
-                >
+                  }}>
                   <option value="رجال">رجال</option>
                   <option value="نساء">نساء</option>
                 </select>
@@ -1257,16 +1350,13 @@ function UsersPage({ users, setUsers, companies, toast }) {
           {needsSectionOnly && (
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>قسم المتابعة</label>
-              <select
-                value={form.section}
-                onChange={e => setForm(p => ({ ...p, section: e.target.value }))}
+              <select value={form.section} onChange={e => setForm(p => ({ ...p, section: e.target.value }))}
                 style={{
                   width: '100%', padding: '12px 14px', fontSize: 15,
                   borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
                   direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff',
                   fontFamily: 'inherit',
-                }}
-              >
+                }}>
                 <option value="رجال">قسم الرجال (يتابع كل مدخلي الرجال في كل الشركات)</option>
                 <option value="نساء">قسم النساء (يتابع كل مدخلات النساء في كل الشركات)</option>
               </select>
@@ -1301,9 +1391,7 @@ function UsersPage({ users, setUsers, companies, toast }) {
                   background: role?.color || THEME.colors.primary,
                   color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontWeight: 700, fontSize: 18, flexShrink: 0,
-                }}>
-                  {u.name.charAt(0)}
-                </div>
+                }}>{u.name.charAt(0)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
                     <span style={{ fontSize: 15, fontWeight: 700 }}>{u.name}</span>
@@ -1322,9 +1410,7 @@ function UsersPage({ users, setUsers, companies, toast }) {
                   <Button size="sm" variant={u.active ? 'outline' : 'success'} onClick={() => toggleActive(u)}>
                     {u.active ? 'تعطيل' : 'تفعيل'}
                   </Button>
-                  {u.username !== 's123' && (
-                    <Button size="sm" variant="danger" icon={Trash2} onClick={() => remove(u)} />
-                  )}
+                  {u.username !== 's123' && <Button size="sm" variant="danger" icon={Trash2} onClick={() => remove(u)} />}
                 </div>
               </div>
             </Card>
@@ -1336,30 +1422,18 @@ function UsersPage({ users, setUsers, companies, toast }) {
 }
 
 // =================================================================
-// Admin: Companies Management — جديدة!
+// Companies Management
 // =================================================================
 function CompaniesPage({ companies, setCompanies, toast }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: '', code: '', contract: '' });
 
-  const openNew = () => {
-    setEditing(null);
-    setForm({ name: '', code: '', contract: '' });
-    setShowForm(true);
-  };
-
-  const openEdit = (c) => {
-    setEditing(c);
-    setForm({ ...c });
-    setShowForm(true);
-  };
+  const openNew = () => { setEditing(null); setForm({ name: '', code: '', contract: '' }); setShowForm(true); };
+  const openEdit = (c) => { setEditing(c); setForm({ ...c }); setShowForm(true); };
 
   const save = () => {
-    if (!form.name) {
-      toast.show('اسم الشركة مطلوب', 'warning');
-      return;
-    }
+    if (!form.name) { toast.show('اسم الشركة مطلوب', 'warning'); return; }
     if (editing) {
       setCompanies(prev => prev.map(c => c.id === editing.id ? { ...c, ...form } : c));
       toast.show('تم تحديث الشركة', 'success');
@@ -1376,7 +1450,7 @@ function CompaniesPage({ companies, setCompanies, toast }) {
   };
 
   const remove = (c) => {
-    if (confirm(`هل أنت متأكد من حذف ${c.name}؟ ستُحذف كل بياناتها.`)) {
+    if (confirm(`حذف ${c.name}؟`)) {
       setCompanies(prev => prev.filter(x => x.id !== c.id));
       toast.show('تم حذف الشركة', 'info');
     }
@@ -1386,17 +1460,13 @@ function CompaniesPage({ companies, setCompanies, toast }) {
     return (
       <Card padding={20}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700 }}>
-            {editing ? `تعديل: ${editing.name}` : 'إضافة شركة جديدة'}
-          </h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700 }}>{editing ? `تعديل: ${editing.name}` : 'إضافة شركة جديدة'}</h2>
           <Button variant="ghost" icon={X} onClick={() => setShowForm(false)} />
         </div>
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Input label="اسم الشركة" icon={Building2} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="مثلاً: شركة الإتقان" />
           <Input label="الرمز المختصر (اختياري)" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} placeholder="مثلاً: ITQ" />
           <Input label="رقم العقد (اختياري)" value={form.contract} onChange={e => setForm(p => ({ ...p, contract: e.target.value }))} placeholder="مثلاً: MOH-1447-001" />
-
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
             <Button variant="primary" icon={Save} onClick={save} fullWidth>حفظ</Button>
             <Button variant="outline" onClick={() => setShowForm(false)} fullWidth>إلغاء</Button>
@@ -1412,7 +1482,6 @@ function CompaniesPage({ companies, setCompanies, toast }) {
         <h2 style={{ fontSize: 20, fontWeight: 700 }}>إدارة الشركات</h2>
         <Button variant="primary" icon={Plus} onClick={openNew}>إضافة شركة جديدة</Button>
       </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {companies.map(c => (
           <Card key={c.id} padding={14}>
@@ -1422,20 +1491,14 @@ function CompaniesPage({ companies, setCompanies, toast }) {
                 background: THEME.colors.primary, color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0,
-              }}>
-                <Building2 size={20} />
-              </div>
+              }}><Building2 size={20} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
                   <span style={{ fontSize: 15, fontWeight: 700 }}>{c.name}</span>
                   {c.code && <Badge color="accent">{c.code}</Badge>}
                   {!c.active && <Badge color="gray">معطّلة</Badge>}
                 </div>
-                {c.contract && (
-                  <div style={{ fontSize: 12, color: THEME.colors.textSecondary }}>
-                    عقد: {c.contract}
-                  </div>
-                )}
+                {c.contract && <div style={{ fontSize: 12, color: THEME.colors.textSecondary }}>عقد: {c.contract}</div>}
               </div>
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                 <Button size="sm" variant="outline" icon={Edit2} onClick={() => openEdit(c)} />
@@ -1453,7 +1516,7 @@ function CompaniesPage({ companies, setCompanies, toast }) {
 }
 
 // =================================================================
-// Admin: Teams Management
+// Teams Management
 // =================================================================
 function TeamsManagementPage({ teams, setTeams, toast }) {
   const [expandedTeam, setExpandedTeam] = useState(null);
@@ -1479,10 +1542,7 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
 
   const saveCriterion = () => {
     const { teamId, isNew, criterion } = editingCriterion;
-    if (!criterion.name) {
-      toast.show('اسم المعيار مطلوب', 'warning');
-      return;
-    }
+    if (!criterion.name) { toast.show('اسم المعيار مطلوب', 'warning'); return; }
     setTeams(prev => prev.map(t => {
       if (t.id !== teamId) return t;
       const criteria = isNew ? [...t.criteria, criterion]
@@ -1494,26 +1554,21 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
   };
 
   const deleteCriterion = (teamId, criterionId) => {
-    if (!confirm('حذف هذا المعيار؟')) return;
-    setTeams(prev => prev.map(t => t.id === teamId ? {
-      ...t, criteria: t.criteria.filter(c => c.id !== criterionId),
-    } : t));
-    toast.show('تم حذف المعيار', 'info');
+    if (!confirm('حذف المعيار؟')) return;
+    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, criteria: t.criteria.filter(c => c.id !== criterionId) } : t));
+    toast.show('تم الحذف', 'info');
   };
 
   const deleteTeam = (teamId) => {
-    if (!confirm('حذف هذا الفريق وكل معاييره؟')) return;
+    if (!confirm('حذف الفريق؟')) return;
     setTeams(prev => prev.filter(t => t.id !== teamId));
-    toast.show('تم حذف الفريق', 'info');
+    toast.show('تم الحذف', 'info');
   };
 
   const addNewTeam = () => {
-    if (!teamForm.name) {
-      toast.show('اسم الفريق مطلوب', 'warning');
-      return;
-    }
+    if (!teamForm.name) { toast.show('اسم الفريق مطلوب', 'warning'); return; }
     setTeams(prev => [...prev, { id: 't_' + genId(), ...teamForm, criteria: [] }]);
-    toast.show('تم إضافة الفريق', 'success');
+    toast.show('تم الإضافة', 'success');
     setShowAddTeam(false);
     setTeamForm({ name: '', description: '', startDateId: '1' });
   };
@@ -1536,18 +1591,14 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>نص المعيار</label>
-            <textarea
-              value={c.name}
-              onChange={e => updateField('name', e.target.value)}
-              placeholder="مثلاً: تواجد مدير الموقع في استقبال ضيوف الرحمن"
-              rows={2}
+            <textarea value={c.name} onChange={e => updateField('name', e.target.value)}
+              placeholder="مثلاً: تواجد مدير الموقع" rows={2}
               style={{
                 width: '100%', padding: '12px 14px', fontSize: 15,
                 borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
                 direction: 'rtl', outline: 'none', boxSizing: 'border-box',
                 fontFamily: 'inherit', resize: 'vertical',
-              }}
-            />
+              }}/>
           </div>
 
           <div>
@@ -1561,9 +1612,7 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
                 const Icon = opt.icon;
                 const selected = c.type === opt.val;
                 return (
-                  <button
-                    key={opt.val}
-                    onClick={() => updateField('type', opt.val)}
+                  <button key={opt.val} onClick={() => updateField('type', opt.val)}
                     style={{
                       padding: '12px 14px',
                       background: selected ? THEME.colors.primary : THEME.colors.surface,
@@ -1573,10 +1622,8 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
                       fontSize: 13, fontWeight: 700,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                       minHeight: 48, cursor: 'pointer', fontFamily: 'inherit',
-                    }}
-                  >
-                    <Icon size={16} />
-                    {opt.label}
+                    }}>
+                    <Icon size={16} />{opt.label}
                   </button>
                 );
               })}
@@ -1584,12 +1631,8 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
           </div>
 
           {c.type === 'number' && (
-            <Input
-              label="وحدة القياس (مثلاً: كجم، كيس)"
-              value={c.unit || ''}
-              onChange={e => updateField('unit', e.target.value)}
-              placeholder="كجم"
-            />
+            <Input label="وحدة القياس" value={c.unit || ''}
+              onChange={e => updateField('unit', e.target.value)} placeholder="كجم"/>
           )}
 
           <div>
@@ -1601,9 +1644,7 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
               ].map(opt => {
                 const selected = c.repeat === opt.val;
                 return (
-                  <button
-                    key={opt.val}
-                    onClick={() => updateField('repeat', opt.val)}
+                  <button key={opt.val} onClick={() => updateField('repeat', opt.val)}
                     style={{
                       padding: '12px 14px',
                       background: selected ? THEME.colors.primary : THEME.colors.surface,
@@ -1614,8 +1655,7 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
                       display: 'flex', flexDirection: 'column', gap: 4,
                       minHeight: 56, cursor: 'pointer', textAlign: 'right',
                       fontFamily: 'inherit',
-                    }}
-                  >
+                    }}>
                     <span>{opt.label}</span>
                     <span style={{ fontSize: 10, opacity: 0.8, fontWeight: 500 }}>{opt.desc}</span>
                   </button>
@@ -1626,16 +1666,13 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
 
           <div>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>إلزامية الملاحظة</label>
-            <select
-              value={c.noteRequired}
-              onChange={e => updateField('noteRequired', e.target.value)}
+            <select value={c.noteRequired} onChange={e => updateField('noteRequired', e.target.value)}
               style={{
                 width: '100%', padding: '12px 14px', fontSize: 15,
                 borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
                 direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff',
                 fontFamily: 'inherit',
-              }}
-            >
+              }}>
               <option value="no">اختيارية</option>
               <option value="low">إلزامية عند التقييم السلبي</option>
               <option value="always">إلزامية دائماً</option>
@@ -1663,16 +1700,13 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
           <Input label="الوصف" value={teamForm.description} onChange={e => setTeamForm(p => ({ ...p, description: e.target.value }))} placeholder="وصف موجز" />
           <div>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>تاريخ بدء العمل</label>
-            <select
-              value={teamForm.startDateId}
-              onChange={e => setTeamForm(p => ({ ...p, startDateId: e.target.value }))}
+            <select value={teamForm.startDateId} onChange={e => setTeamForm(p => ({ ...p, startDateId: e.target.value }))}
               style={{
                 width: '100%', padding: '12px 14px', fontSize: 15,
                 borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
                 direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff',
                 fontFamily: 'inherit',
-              }}
-            >
+              }}>
               {DATES.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
             </select>
           </div>
@@ -1698,14 +1732,11 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
           const startDate = DATES.find(d => d.id === team.startDateId);
           return (
             <Card key={team.id} padding={0}>
-              <div
-                style={{
-                  padding: 16, display: 'flex', alignItems: 'center',
-                  justifyContent: 'space-between', cursor: 'pointer',
-                  flexWrap: 'wrap', gap: 10,
-                }}
-                onClick={() => setExpandedTeam(isExpanded ? null : team.id)}
-              >
+              <div style={{
+                padding: 16, display: 'flex', alignItems: 'center',
+                justifyContent: 'space-between', cursor: 'pointer',
+                flexWrap: 'wrap', gap: 10,
+              }} onClick={() => setExpandedTeam(isExpanded ? null : team.id)}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -1721,16 +1752,14 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
                 <div style={{ padding: '0 16px 16px', borderTop: `1px solid ${THEME.colors.border}` }}>
                   <div style={{ marginTop: 14 }}>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 4 }}>تاريخ بدء العمل</label>
-                    <select
-                      value={team.startDateId}
+                    <select value={team.startDateId}
                       onChange={e => updateTeam(team.id, { startDateId: e.target.value })}
                       style={{
                         width: '100%', padding: '8px 12px', fontSize: 13,
                         borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`,
                         direction: 'rtl', outline: 'none', background: '#fff',
                         fontFamily: 'inherit',
-                      }}
-                    >
+                      }}>
                       {DATES.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
                     </select>
                   </div>
@@ -1773,16 +1802,13 @@ function TeamsManagementPage({ teams, setTeams, toast }) {
 }
 
 // =================================================================
-// Admin: Settings
+// Settings Page
 // =================================================================
 function SettingsPage({ settings, setSettings, toast }) {
   const [tempDate, setTempDate] = useState(settings.seasonStartDate || '');
 
   const saveSettings = () => {
-    if (!tempDate) {
-      toast.show('الرجاء تحديد تاريخ', 'warning');
-      return;
-    }
+    if (!tempDate) { toast.show('الرجاء تحديد تاريخ', 'warning'); return; }
     setSettings(prev => ({ ...prev, seasonStartDate: tempDate }));
     toast.show('تم حفظ تاريخ بداية الموسم', 'success');
   };
@@ -1790,13 +1816,11 @@ function SettingsPage({ settings, setSettings, toast }) {
   return (
     <div>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>إعدادات النظام</h2>
-
       <Card padding={20}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <Calendar size={20} color={THEME.colors.accent} strokeWidth={2} />
           <h3 style={{ fontSize: 16, fontWeight: 700 }}>تاريخ بداية موسم ذي الحجة</h3>
         </div>
-
         <div style={{
           padding: 12, background: THEME.colors.infoSoft,
           color: THEME.colors.info, borderRadius: THEME.radius.md,
@@ -1805,17 +1829,10 @@ function SettingsPage({ settings, setSettings, toast }) {
         }}>
           <Info size={18} style={{ flexShrink: 0, marginTop: 2 }} />
           <div>
-            حدّد التاريخ الميلادي ليوم 1 من شهر ذي الحجة (وفقاً لرؤية الهلال). سيُحدّد هذا تلقائياً اليوم الافتراضي والتاريخ الميلادي لكل يوم.
+            حدّد التاريخ الميلادي ليوم 1 من شهر ذي الحجة. سيُحدّد هذا تلقائياً اليوم الافتراضي والتاريخ الميلادي لكل يوم.
           </div>
         </div>
-
-        <Input
-          label="تاريخ 1 ذي الحجة (ميلادي)"
-          type="date"
-          value={tempDate}
-          onChange={e => setTempDate(e.target.value)}
-        />
-
+        <Input label="تاريخ 1 ذي الحجة (ميلادي)" type="date" value={tempDate} onChange={e => setTempDate(e.target.value)} />
         {settings.seasonStartDate && (
           <div style={{
             marginTop: 12, padding: 10,
@@ -1824,10 +1841,9 @@ function SettingsPage({ settings, setSettings, toast }) {
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <CheckCircle2 size={16} />
-            التاريخ الحالي المحفوظ: {new Date(settings.seasonStartDate).toLocaleDateString('ar-SA')}
+            التاريخ الحالي: {new Date(settings.seasonStartDate).toLocaleDateString('ar-SA')}
           </div>
         )}
-
         <Button variant="primary" icon={Save} onClick={saveSettings} fullWidth style={{ marginTop: 14 }}>
           حفظ التاريخ
         </Button>
@@ -1837,12 +1853,12 @@ function SettingsPage({ settings, setSettings, toast }) {
 }
 
 // =================================================================
-// Main App
+// Main App — مع القائمة الثابتة
 // =================================================================
 export default function App() {
   const [user, setUser] = useState(null);
   const [page, setPage] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { toasts, show } = useToast();
   const toast = { show };
 
@@ -1851,6 +1867,15 @@ export default function App() {
   const [teams, setTeams] = useState(INITIAL_TEAMS);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [evaluations, setEvaluations] = useState({});
+
+  // detect mobile
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const pages = useMemo(() => {
     if (!user) return [];
@@ -1872,9 +1897,7 @@ export default function App() {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (user && pages.length) setPage(pages[0].id);
-  }, [user]);
+  useEffect(() => { if (user && pages.length) setPage(pages[0].id); }, [user]);
 
   if (!user) {
     return (
@@ -1886,11 +1909,52 @@ export default function App() {
   }
 
   const company = companies.find(c => c.id === user.companyId);
+  const currentPageLabel = pages.find(p => p.id === page)?.label;
+
+  // مكوّن القائمة الجانبية (نفس المحتوى في النسختين Desktop و Mobile)
+  const sidebarContent = (
+    <>
+      <div style={{ padding: 20, borderBottom: '1px solid rgba(255,255,255,0.08)', background: '#fff' }}>
+        <Logo height={50} />
+        <div style={{ fontSize: 12, color: THEME.colors.textTertiary, marginTop: 6 }}>{user.name}</div>
+      </div>
+      <nav style={{ flex: 1, padding: '12px 0', overflowY: 'auto' }}>
+        {pages.map(p => {
+          const Icon = p.icon;
+          const active = page === p.id;
+          return (
+            <button key={p.id}
+              onClick={() => { setPage(p.id); setMobileSidebarOpen(false); }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 18px',
+                background: active ? 'rgba(184,153,104,0.12)' : 'transparent',
+                border: 'none',
+                borderRight: active ? `3px solid ${THEME.colors.accent}` : '3px solid transparent',
+                color: active ? THEME.colors.accent : 'rgba(255,255,255,0.65)',
+                fontSize: 14, fontWeight: active ? 700 : 500,
+                textAlign: 'right', fontFamily: 'inherit', cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}>
+              <Icon size={20} />
+              {p.label}
+            </button>
+          );
+        })}
+      </nav>
+      <div style={{ padding: 18, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <Button variant="danger" fullWidth icon={LogOut} onClick={() => { setUser(null); setMobileSidebarOpen(false); }}>
+          تسجيل الخروج
+        </Button>
+      </div>
+    </>
+  );
 
   return (
     <>
       <ToastContainer toasts={toasts} />
       <div style={{ minHeight: '100vh', background: THEME.colors.bg }}>
+        {/* Top Bar */}
         <div style={{
           background: THEME.colors.surface,
           borderBottom: `1px solid ${THEME.colors.border}`,
@@ -1899,19 +1963,20 @@ export default function App() {
           position: 'sticky', top: 0, zIndex: 50,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              onClick={() => setSidebarOpen(v => !v)}
-              style={{
-                background: THEME.colors.bgSecondary, border: 'none',
-                borderRadius: THEME.radius.md, padding: 10, cursor: 'pointer',
-              }}
-            >
-              <Menu size={20} color={THEME.colors.primary} />
-            </button>
+            {isMobile && (
+              <button
+                onClick={() => setMobileSidebarOpen(v => !v)}
+                style={{
+                  background: THEME.colors.bgSecondary, border: 'none',
+                  borderRadius: THEME.radius.md, padding: 10, cursor: 'pointer',
+                }}>
+                <Menu size={20} color={THEME.colors.primary} />
+              </button>
+            )}
             <Logo height={36} />
             <div style={{ borderRight: `1px solid ${THEME.colors.border}`, paddingRight: 12, marginRight: 4 }}>
               <h1 style={{ fontSize: 15, fontWeight: 700, color: THEME.colors.primary }}>
-                {pages.find(p => p.id === page)?.label}
+                {currentPageLabel}
               </h1>
               {company && (
                 <p style={{ fontSize: 11, color: THEME.colors.textTertiary }}>
@@ -1938,68 +2003,63 @@ export default function App() {
           </div>
         </div>
 
-        {sidebarOpen && (
+        {/* Mobile Sidebar Overlay */}
+        {isMobile && mobileSidebarOpen && (
           <div
-            onClick={() => setSidebarOpen(false)}
+            onClick={() => setMobileSidebarOpen(false)}
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100 }}
           >
             <aside
               onClick={e => e.stopPropagation()}
               style={{
-                width: 260, background: THEME.colors.primary, color: '#fff',
+                width: 280, background: THEME.colors.primary, color: '#fff',
                 height: '100vh', position: 'fixed', top: 0, right: 0,
                 display: 'flex', flexDirection: 'column',
-              }}
-            >
-              <div style={{ padding: 20, borderBottom: '1px solid rgba(255,255,255,0.08)', background: '#fff' }}>
-                <Logo height={50} />
-                <div style={{ fontSize: 12, color: THEME.colors.textTertiary, marginTop: 6 }}>{user.name}</div>
-              </div>
-
-              <nav style={{ flex: 1, padding: '12px 0' }}>
-                {pages.map(p => {
-                  const Icon = p.icon;
-                  const active = page === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => { setPage(p.id); setSidebarOpen(false); }}
-                      style={{
-                        width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                        padding: '12px 18px',
-                        background: active ? 'rgba(184,153,104,0.12)' : 'transparent',
-                        border: 'none',
-                        borderRight: active ? `3px solid ${THEME.colors.accent}` : '3px solid transparent',
-                        color: active ? THEME.colors.accent : 'rgba(255,255,255,0.65)',
-                        fontSize: 14, fontWeight: active ? 700 : 500,
-                        textAlign: 'right', fontFamily: 'inherit', cursor: 'pointer',
-                      }}
-                    >
-                      <Icon size={20} />
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </nav>
-
-              <div style={{ padding: 18, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <Button variant="danger" fullWidth icon={LogOut} onClick={() => { setUser(null); setSidebarOpen(false); }}>
-                  تسجيل الخروج
-                </Button>
-              </div>
+                animation: 'slideInRight 0.2s ease-out',
+              }}>
+              {sidebarContent}
             </aside>
           </div>
         )}
 
-        <main style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
-          {page === 'dashboard' && <DashboardPage teams={teams} companies={companies} settings={settings} />}
-          {page === 'supervisor' && <SupervisorPage user={user} users={users} companies={companies} teams={teams} evaluations={evaluations} settings={settings} toast={toast} />}
-          {page === 'entry' && <DataEntryPage user={user} teams={teams} settings={settings} toast={toast} evaluations={evaluations} setEvaluations={setEvaluations} />}
-          {page === 'users' && <UsersPage users={users} setUsers={setUsers} companies={companies} toast={toast} />}
-          {page === 'companies' && <CompaniesPage companies={companies} setCompanies={setCompanies} toast={toast} />}
-          {page === 'teamsAdmin' && <TeamsManagementPage teams={teams} setTeams={setTeams} toast={toast} />}
-          {page === 'settings' && <SettingsPage settings={settings} setSettings={setSettings} toast={toast} />}
-        </main>
+        {/* Layout: Sidebar + Main */}
+        <div style={{
+          display: 'flex',
+          maxWidth: 1400,
+          margin: '0 auto',
+        }}>
+          {/* Desktop Sidebar - دائماً ظاهرة */}
+          {!isMobile && (
+            <aside style={{
+              width: 240,
+              background: THEME.colors.primary,
+              color: '#fff',
+              minHeight: 'calc(100vh - 64px)',
+              position: 'sticky',
+              top: 64,
+              display: 'flex',
+              flexDirection: 'column',
+              flexShrink: 0,
+            }}>
+              {sidebarContent}
+            </aside>
+          )}
+
+          {/* Main Content */}
+          <main style={{
+            flex: 1,
+            padding: 16,
+            minWidth: 0,
+          }}>
+            {page === 'dashboard' && <DashboardPage teams={teams} companies={companies} settings={settings} />}
+            {page === 'supervisor' && <SupervisorPage user={user} users={users} companies={companies} teams={teams} evaluations={evaluations} settings={settings} toast={toast} />}
+            {page === 'entry' && <DataEntryPage user={user} teams={teams} settings={settings} toast={toast} evaluations={evaluations} setEvaluations={setEvaluations} />}
+            {page === 'users' && <UsersPage users={users} setUsers={setUsers} companies={companies} toast={toast} />}
+            {page === 'companies' && <CompaniesPage companies={companies} setCompanies={setCompanies} toast={toast} />}
+            {page === 'teamsAdmin' && <TeamsManagementPage teams={teams} setTeams={setTeams} toast={toast} />}
+            {page === 'settings' && <SettingsPage settings={settings} setSettings={setSettings} toast={toast} />}
+          </main>
+        </div>
       </div>
     </>
   );
