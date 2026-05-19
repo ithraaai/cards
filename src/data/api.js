@@ -152,6 +152,8 @@ export async function updateSettings(updates) {
   if (updates.session2CloseTime !== undefined) payload.session2_close_time = updates.session2CloseTime;
   if (updates.sessionsScopeSection !== undefined) payload.sessions_scope_section = updates.sessionsScopeSection;
   if (updates.sessionsScopeTeams !== undefined) payload.sessions_scope_teams = updates.sessionsScopeTeams;
+  if (updates.entryReportSections !== undefined) payload.entry_report_sections = updates.entryReportSections;
+  if (updates.adminReportSections !== undefined) payload.admin_report_sections = updates.adminReportSections;
 
   const { data, error } = await supabase
     .from('settings').update(payload).eq('id', 1).select().single();

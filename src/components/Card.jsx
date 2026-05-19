@@ -1,8 +1,8 @@
 import { THEME } from '../data/theme.js';
 
-export function Card({ children, style = {}, padding = 20 }) {
+export function Card({ children, style = {}, padding = 20, className = '' }) {
   return (
-    <div style={{
+    <div className={className} style={{
       background: THEME.colors.surface,
       borderRadius: THEME.radius.lg,
       border: `1px solid ${THEME.colors.border}`,

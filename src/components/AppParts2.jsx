@@ -830,7 +830,203 @@ export function SettingsPage({ settings, teams, refreshSettings, toast }) {
           })}
         </div>
       </Card>
+
+      {/* إدارة عناصر تقرير مدخل البيانات */}
+      <ReportSectionsManager
+        title="عناصر تقرير مدخل البيانات"
+        description="تحكّم في أقسام التقرير التي يصدرها مدخل البيانات اليومي. اسحب لإعادة الترتيب أو فعّل/عطّل الأقسام."
+        defaultSections={ENTRY_REPORT_DEFAULT}
+        savedSections={settings.entry_report_sections}
+        onSave={async (sections) => {
+          try {
+            await api.updateSettings({ entryReportSections: sections });
+            await refreshSettings();
+            toast.show('تم حفظ عناصر تقرير المدخل', 'success');
+          } catch (err) { toast.show('فشل الحفظ', 'error'); }
+        }}
+        icon={FileText}
+        iconColor={THEME.colors.info}
+      />
+
+      {/* إدارة عناصر تقرير مدير النظام */}
+      <ReportSectionsManager
+        title="عناصر تقرير مدير النظام"
+        description="تحكّم في أقسام تقرير لوحة المتابعة. اسحب لإعادة الترتيب أو فعّل/عطّل الأقسام."
+        defaultSections={ADMIN_REPORT_DEFAULT}
+        savedSections={settings.admin_report_sections}
+        onSave={async (sections) => {
+          try {
+            await api.updateSettings({ adminReportSections: sections });
+            await refreshSettings();
+            toast.show('تم حفظ عناصر التقرير', 'success');
+          } catch (err) { toast.show('فشل الحفظ', 'error'); }
+        }}
+        icon={FileBarChart}
+        iconColor={THEME.colors.purple}
+      />
     </div>
+  );
+}
+
+// =================================================================
+// إعدادات افتراضية لعناصر التقارير
+// =================================================================
+const ENTRY_REPORT_DEFAULT = [
+  { id: 'kpis', label: 'المؤشرات الرئيسية', enabled: true, order: 1 },
+  { id: 'teams_progress', label: 'إنجاز كل فريق', enabled: true, order: 2 },
+  { id: 'sessions_comparison', label: 'مقارنة الجلستين', enabled: true, order: 3 },
+  { id: 'charts', label: 'الرسوم البيانية (نعم/لا + التقييمات)', enabled: true, order: 4 },
+  { id: 'teams_chart', label: 'مقارنة الفرق (شريطي)', enabled: true, order: 5 },
+  { id: 'radar', label: 'رسم رادار', enabled: true, order: 6 },
+  { id: 'problems', label: 'المعايير التي تحتاج انتباه', enabled: true, order: 7 },
+  { id: 'positive_highlights', label: 'الإنجازات الإيجابية', enabled: false, order: 8 },
+];
+
+const ADMIN_REPORT_DEFAULT = [
+  { id: 'kpis', label: 'المؤشرات الرئيسية', enabled: true, order: 1 },
+  { id: 'insights', label: 'الرؤى الذكية والتوصيات', enabled: true, order: 2 },
+  { id: 'companyChart', label: 'مقارنة الشركات', enabled: true, order: 3 },
+  { id: 'teamsChart', label: 'مقارنة الفرق', enabled: true, order: 4 },
+  { id: 'leaderboard', label: 'ترتيب الشركات', enabled: true, order: 5 },
+  { id: 'scaleDistribution', label: 'توزيع التقييمات', enabled: true, order: 6 },
+  { id: 'dailyTrend', label: 'الاتجاه اليومي', enabled: true, order: 7 },
+  { id: 'topBottomTeams', label: 'أفضل/أسوأ الفرق', enabled: true, order: 8 },
+  { id: 'notes', label: 'الملاحظات السلبية', enabled: false, order: 9 },
+];
+
+// =================================================================
+// مدير عناصر التقارير - drag & drop بسيط
+// =================================================================
+function ReportSectionsManager({ title, description, defaultSections, savedSections, onSave, icon: Icon, iconColor }) {
+  // دمج المحفوظ مع الافتراضي (لإضافة أي عناصر جديدة)
+  const initial = useMemo(() => {
+    const saved = Array.isArray(savedSections) && savedSections.length > 0 ? savedSections : [];
+    const savedIds = new Set(saved.map(s => s.id));
+    const merged = [...saved];
+    defaultSections.forEach(d => {
+      if (!savedIds.has(d.id)) merged.push(d);
+    });
+    return merged.sort((a, b) => a.order - b.order);
+  }, [savedSections, defaultSections]);
+
+  const [sections, setSections] = useState(initial);
+  const [dragIdx, setDragIdx] = useState(null);
+
+  useEffect(() => { setSections(initial); }, [savedSections]);
+
+  const toggle = (id) => {
+    setSections(prev => prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s));
+  };
+
+  const moveUp = (idx) => {
+    if (idx === 0) return;
+    setSections(prev => {
+      const newArr = [...prev];
+      [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]];
+      return newArr.map((s, i) => ({ ...s, order: i + 1 }));
+    });
+  };
+
+  const moveDown = (idx) => {
+    setSections(prev => {
+      if (idx === prev.length - 1) return prev;
+      const newArr = [...prev];
+      [newArr[idx], newArr[idx + 1]] = [newArr[idx + 1], newArr[idx]];
+      return newArr.map((s, i) => ({ ...s, order: i + 1 }));
+    });
+  };
+
+  const handleDragStart = (idx) => setDragIdx(idx);
+  const handleDragOver = (e) => e.preventDefault();
+  const handleDrop = (idx) => {
+    if (dragIdx === null || dragIdx === idx) return;
+    setSections(prev => {
+      const newArr = [...prev];
+      const [moved] = newArr.splice(dragIdx, 1);
+      newArr.splice(idx, 0, moved);
+      return newArr.map((s, i) => ({ ...s, order: i + 1 }));
+    });
+    setDragIdx(null);
+  };
+
+  const enabledCount = sections.filter(s => s.enabled).length;
+
+  return (
+    <Card padding={20}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <Icon size={20} color={iconColor} />
+        <div style={{ flex: 1 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700 }}>{title}</h3>
+          <div style={{ fontSize: 11, color: THEME.colors.textTertiary, marginTop: 2 }}>{description}</div>
+        </div>
+        <Badge color="accent">{enabledCount}/{sections.length} مفعّل</Badge>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+        {sections.map((s, i) => (
+          <div
+            key={s.id}
+            draggable
+            onDragStart={() => handleDragStart(i)}
+            onDragOver={handleDragOver}
+            onDrop={() => handleDrop(i)}
+            style={{
+              padding: '10px 12px',
+              background: s.enabled ? '#fff' : THEME.colors.bgSecondary,
+              border: `1.5px solid ${s.enabled ? THEME.colors.success + '40' : THEME.colors.border}`,
+              borderRadius: THEME.radius.md,
+              display: 'flex', alignItems: 'center', gap: 10,
+              cursor: 'move', transition: 'all 0.2s',
+              opacity: s.enabled ? 1 : 0.6,
+            }}>
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 2,
+              color: THEME.colors.textTertiary, cursor: 'grab',
+            }}>
+              <div style={{ display: 'flex', gap: 2 }}><span>•</span><span>•</span></div>
+              <div style={{ display: 'flex', gap: 2 }}><span>•</span><span>•</span></div>
+              <div style={{ display: 'flex', gap: 2 }}><span>•</span><span>•</span></div>
+            </div>
+            <div style={{
+              width: 26, height: 26, borderRadius: 6,
+              background: s.enabled ? THEME.colors.success : THEME.colors.bgSecondary,
+              color: s.enabled ? '#fff' : THEME.colors.textTertiary,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 700, flexShrink: 0,
+            }}>{i + 1}</div>
+            <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{s.label}</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={() => moveUp(i)} disabled={i === 0}
+                style={{ width: 28, height: 28, border: `1px solid ${THEME.colors.border}`, background: '#fff', borderRadius: 6, cursor: i === 0 ? 'not-allowed' : 'pointer', opacity: i === 0 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
+                <ChevronUp size={14} />
+              </button>
+              <button onClick={() => moveDown(i)} disabled={i === sections.length - 1}
+                style={{ width: 28, height: 28, border: `1px solid ${THEME.colors.border}`, background: '#fff', borderRadius: 6, cursor: i === sections.length - 1 ? 'not-allowed' : 'pointer', opacity: i === sections.length - 1 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
+                <ChevronDown size={14} />
+              </button>
+            </div>
+            <button onClick={() => toggle(s.id)}
+              style={{
+                width: 44, height: 24, borderRadius: 12,
+                background: s.enabled ? THEME.colors.success : THEME.colors.bgSecondary,
+                border: 'none', position: 'relative', cursor: 'pointer',
+                transition: 'all 0.2s', fontFamily: 'inherit',
+              }}>
+              <div style={{
+                position: 'absolute', top: 2,
+                left: s.enabled ? 22 : 2,
+                width: 20, height: 20, borderRadius: '50%', background: '#fff',
+                transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              }} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <Button variant="primary" icon={Save} onClick={() => onSave(sections)} fullWidth>
+        حفظ ترتيب وتفعيل الأقسام
+      </Button>
+    </Card>
   );
 }
 
@@ -844,10 +1040,31 @@ export function ReportsPage({ teams, companies, evaluations, settings, toast }) 
   const [selectedCompanies, setSelectedCompanies] = useState([]);
   const [selectedSections, setSelectedSections] = useState([]);
   const [selectedTeams, setSelectedTeams] = useState([]);
-  const [reportSections, setReportSections] = useState({
-    kpis: true, companyChart: true, teamsChart: true,
-    scaleDistribution: true, leaderboard: true, notes: false,
-  });
+
+  // قراءة إعدادات الأقسام من settings (يضبطها المدير في الإعدادات)
+  const adminReportSections = useMemo(() => {
+    const saved = settings.admin_report_sections;
+    if (Array.isArray(saved) && saved.length > 0) return saved;
+    // الافتراضي إذا لم يُحفظ شيء
+    return [
+      { id: 'kpis', label: 'المؤشرات الرئيسية', enabled: true, order: 1 },
+      { id: 'insights', label: 'الرؤى الذكية', enabled: true, order: 2 },
+      { id: 'companyChart', label: 'مقارنة الشركات', enabled: true, order: 3 },
+      { id: 'teamsChart', label: 'مقارنة الفرق', enabled: true, order: 4 },
+      { id: 'leaderboard', label: 'ترتيب الشركات', enabled: true, order: 5 },
+      { id: 'scaleDistribution', label: 'توزيع التقييمات', enabled: true, order: 6 },
+      { id: 'dailyTrend', label: 'الاتجاه اليومي', enabled: true, order: 7 },
+      { id: 'topBottomTeams', label: 'أفضل/أسوأ الفرق', enabled: true, order: 8 },
+      { id: 'notes', label: 'الملاحظات السلبية', enabled: false, order: 9 },
+    ];
+  }, [settings]);
+
+  const isEnabled = (id) => adminReportSections.find(s => s.id === id)?.enabled;
+  const sortedAdminSections = useMemo(() =>
+    [...adminReportSections].sort((a, b) => a.order - b.order),
+    [adminReportSections]
+  );
+
   const [generating, setGenerating] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const reportRef = useRef(null);
@@ -993,7 +1210,7 @@ export function ReportsPage({ teams, companies, evaluations, settings, toast }) 
             <div style={{ fontSize: 11, color: THEME.colors.textTertiary, marginTop: 4 }}>تاريخ التقرير: {new Date().toLocaleDateString('ar-SA')}</div>
           </div>
 
-          {reportSections.kpis && (
+          {isEnabled("kpis") && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
               <KPICard icon={CheckCircle2} label="المعدل العام" value={stats.overall} unit="%" color="success" />
               <KPICard icon={Award} label="متوسط التقييم" value={stats.avgScale} unit="/5" color="accent" />
@@ -1004,7 +1221,7 @@ export function ReportsPage({ teams, companies, evaluations, settings, toast }) 
             </div>
           )}
 
-          {reportSections.companyChart && companyPerf.length > 0 && (
+          {isEnabled("companyChart") && companyPerf.length > 0 && (
             <Card padding={20} style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                 <Building2 size={20} color={THEME.colors.primary} />
@@ -1023,7 +1240,7 @@ export function ReportsPage({ teams, companies, evaluations, settings, toast }) 
             </Card>
           )}
 
-          {reportSections.teamsChart && teamPerf.length > 0 && (
+          {isEnabled("teamsChart") && teamPerf.length > 0 && (
             <Card padding={20} style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                 <UsersIcon size={20} color={THEME.colors.primary} />
@@ -1042,7 +1259,7 @@ export function ReportsPage({ teams, companies, evaluations, settings, toast }) 
             </Card>
           )}
 
-          {reportSections.scaleDistribution && totalScale > 0 && (
+          {isEnabled("scaleDistribution") && totalScale > 0 && (
             <Card padding={20} style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                 <PieChartIcon size={20} color={THEME.colors.accent} />
@@ -1069,7 +1286,7 @@ export function ReportsPage({ teams, companies, evaluations, settings, toast }) 
             </Card>
           )}
 
-          {reportSections.leaderboard && companyPerf.length > 0 && (
+          {isEnabled("leaderboard") && companyPerf.length > 0 && (
             <Card padding={20} style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                 <Trophy size={20} color={THEME.colors.accent} />
@@ -1090,7 +1307,7 @@ export function ReportsPage({ teams, companies, evaluations, settings, toast }) 
             </Card>
           )}
 
-          {reportSections.notes && negativeNotes.length > 0 && (
+          {isEnabled("notes") && negativeNotes.length > 0 && (
             <Card padding={20} style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                 <MessageSquare size={20} color={THEME.colors.warning} />
@@ -1205,25 +1422,21 @@ export function ReportsPage({ teams, companies, evaluations, settings, toast }) 
         </div>
       </Card>
 
-      <Card padding={20}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <FileText size={18} color={THEME.colors.accent} />
-          <h3 style={{ fontSize: 15, fontWeight: 700 }}>أقسام التقرير</h3>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[
-            { key: 'kpis', label: 'المؤشرات الرئيسية (KPIs)' },
-            { key: 'companyChart', label: 'رسم أداء الشركات' },
-            { key: 'teamsChart', label: 'رسم أداء الفرق' },
-            { key: 'scaleDistribution', label: 'توزيع التقييمات' },
-            { key: 'leaderboard', label: 'ترتيب الشركات' },
-            { key: 'notes', label: 'الملاحظات السلبية' },
-          ].map(opt => (
-            <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: reportSections[opt.key] ? THEME.colors.successSoft : THEME.colors.bgSecondary, borderRadius: THEME.radius.md, cursor: 'pointer' }}>
-              <input type="checkbox" checked={reportSections[opt.key]} onChange={e => setReportSections(prev => ({ ...prev, [opt.key]: e.target.checked }))} style={{ width: 18, height: 18, cursor: 'pointer' }}/>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{opt.label}</span>
-            </label>
-          ))}
+      <Card padding={16} style={{ background: '#F0F7FF', border: `1.5px solid ${THEME.colors.info}33` }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <Info size={20} color={THEME.colors.info} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: THEME.colors.info, marginBottom: 4 }}>
+              تخصيص أقسام التقرير
+            </div>
+            <div style={{ fontSize: 12, color: THEME.colors.textSecondary, lineHeight: 1.7 }}>
+              يمكنك التحكم في الأقسام الظاهرة في هذا التقرير وترتيبها من
+              <strong> "إعدادات النظام" ← "عناصر تقرير مدير النظام"</strong>.
+              <br />
+              <strong>الأقسام المفعّلة حالياً:</strong>{' '}
+              {sortedAdminSections.filter(s => s.enabled).map(s => s.label).join(' · ')}
+            </div>
+          </div>
         </div>
       </Card>
 

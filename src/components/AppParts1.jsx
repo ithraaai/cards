@@ -24,7 +24,7 @@ import { shouldShowCriterion, isTeamActiveOnDate } from '../data/teams.js';
 import {
   DATES, ROLES_CONFIG, SCALE_LABELS,
   getDefaultDateId, getGregorianDateForHijriDay, formatGregorianDate,
-  getDayName, isEvaluationClosed, isSessionsEnabledForUser, isSessionClosed,
+  getDayName, isEvaluationClosed, isSessionsEnabledForUser, isSessionsEnabledForTeam, isSessionClosed,
 } from '../data/seed.js';
 import { THEME } from '../data/theme.js';
 import { calculateStats } from '../data/stats.js';
@@ -135,30 +135,53 @@ function LoginPage({ onLogin, toast }) {
   );
 }
 
-function KPICard({ icon: Icon, label, value, unit, color = 'accent', subtitle }) {
+function KPICard({ icon: Icon, label, value, unit, color = 'accent', subtitle, trend, animated = false }) {
   const colors = {
-    accent: { bg: '#FAF3E0', fg: THEME.colors.accent },
-    success: { bg: THEME.colors.successSoft, fg: THEME.colors.success },
-    warning: { bg: THEME.colors.warningSoft, fg: THEME.colors.warning },
-    danger: { bg: THEME.colors.dangerSoft, fg: THEME.colors.danger },
-    info: { bg: THEME.colors.infoSoft, fg: THEME.colors.info },
-    purple: { bg: THEME.colors.purpleSoft, fg: THEME.colors.purple },
+    accent: { bg: '#FAF3E0', fg: THEME.colors.accent, grad: 'linear-gradient(135deg, #FAF3E0 0%, #F3E4C5 100%)' },
+    success: { bg: THEME.colors.successSoft, fg: THEME.colors.success, grad: 'linear-gradient(135deg, #D4E9DD 0%, #BFDFCC 100%)' },
+    warning: { bg: THEME.colors.warningSoft, fg: THEME.colors.warning, grad: 'linear-gradient(135deg, #FBE9D0 0%, #F8DAB0 100%)' },
+    danger: { bg: THEME.colors.dangerSoft, fg: THEME.colors.danger, grad: 'linear-gradient(135deg, #F5D5D5 0%, #EFB9B9 100%)' },
+    info: { bg: THEME.colors.infoSoft, fg: THEME.colors.info, grad: 'linear-gradient(135deg, #E6F1FB 0%, #C9E0F6 100%)' },
+    purple: { bg: THEME.colors.purpleSoft, fg: THEME.colors.purple, grad: 'linear-gradient(135deg, #E5E5FA 0%, #D0D0F2 100%)' },
   };
   const c = colors[color];
   return (
-    <Card padding={16}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 10 }}>
-        <div style={{ width: 40, height: 40, borderRadius: THEME.radius.md, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={20} color={c.fg} strokeWidth={2.2} />
+    <div className={animated ? 'dash-kpi dash-card' : 'dash-card'} style={{
+      background: '#fff', borderRadius: THEME.radius.lg, padding: 16,
+      border: `1px solid ${THEME.colors.border}`,
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{
+        position: 'absolute', top: -20, left: -20, width: 80, height: 80,
+        background: c.grad, borderRadius: '50%', opacity: 0.4,
+      }} />
+      <div style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{
+            width: 42, height: 42, borderRadius: 10, background: c.grad,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: `0 4px 12px ${c.fg}20`,
+          }}>
+            <Icon size={20} color={c.fg} strokeWidth={2.2} />
+          </div>
+          {trend !== undefined && trend !== null && (
+            <div style={{
+              fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 10,
+              background: trend > 0 ? THEME.colors.successSoft : trend < 0 ? THEME.colors.dangerSoft : THEME.colors.bgSecondary,
+              color: trend > 0 ? THEME.colors.success : trend < 0 ? THEME.colors.danger : THEME.colors.textTertiary,
+            }}>
+              {trend > 0 ? '↑' : trend < 0 ? '↓' : '−'} {Math.abs(trend)}%
+            </div>
+          )}
         </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 2 }}>
+          <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1, color: c.fg, animation: animated ? 'countUp 0.6s ease-out' : 'none' }}>{value}</span>
+          {unit && <span style={{ fontSize: 13, color: THEME.colors.textTertiary, fontWeight: 600 }}>{unit}</span>}
+        </div>
+        <div style={{ fontSize: 12, color: THEME.colors.textSecondary, fontWeight: 600 }}>{label}</div>
+        {subtitle && <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 2 }}>{subtitle}</div>}
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 2 }}>
-        <span style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, color: c.fg }}>{value}</span>
-        {unit && <span style={{ fontSize: 13, color: THEME.colors.textTertiary, fontWeight: 600 }}>{unit}</span>}
-      </div>
-      <div style={{ fontSize: 12, color: THEME.colors.textSecondary, fontWeight: 600 }}>{label}</div>
-      {subtitle && <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 2 }}>{subtitle}</div>}
-    </Card>
+    </div>
   );
 }
 
@@ -311,13 +334,104 @@ function DashboardPage({ teams, companies, evaluations }) {
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <KPICard icon={CheckCircle2} label="المعدل العام" value={stats.overall} unit="%" color="success" />
-        <KPICard icon={Award} label="متوسط التقييم" value={stats.avgScale} unit="/5" color="accent" />
-        <KPICard icon={ThumbsUp} label="نسبة الامتثال" value={stats.complianceRate} unit="%" color="info" />
-        <KPICard icon={Activity} label="إجمالي التقييمات" value={stats.total} color="purple" />
-        <KPICard icon={AlertTriangle} label="ملاحظات سلبية" value={stats.negatives} color="warning" />
-        <KPICard icon={MessageSquare} label="ملاحظات مكتوبة" value={stats.notes} color="info" />
+        <KPICard icon={CheckCircle2} label="المعدل العام" value={stats.overall} unit="%" color="success" animated />
+        <KPICard icon={Award} label="متوسط التقييم" value={stats.avgScale} unit="/5" color="accent" animated />
+        <KPICard icon={ThumbsUp} label="نسبة الامتثال" value={stats.complianceRate} unit="%" color="info" animated />
+        <KPICard icon={Activity} label="إجمالي التقييمات" value={stats.total} color="purple" animated />
+        <KPICard icon={AlertTriangle} label="ملاحظات سلبية" value={stats.negatives} color="warning" animated />
+        <KPICard icon={MessageSquare} label="ملاحظات مكتوبة" value={stats.notes} color="info" animated />
       </div>
+
+      {/* الرؤى الذكية والتوصيات */}
+      {stats.total > 0 && (
+        <Card padding={20} style={{
+          background: 'linear-gradient(135deg, #1B2D3E 0%, #2C4055 100%)',
+          color: '#fff', border: 'none',
+        }} className="dash-section">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: 'rgba(184,153,104,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <TrendingUp size={20} color="#B89968" />
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#B89968' }}>تحليلات ذكية</div>
+              <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>قراءة سريعة لحالة الأداء</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 10 }}>
+            {/* رؤية #1: الحالة العامة */}
+            <div style={{ padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 16 }}>
+                  {stats.overall >= 85 ? '🎯' : stats.overall >= 70 ? '👍' : stats.overall >= 50 ? '⚠️' : '🚨'}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#B89968' }}>الحالة العامة</span>
+              </div>
+              <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>
+                {stats.overall >= 85 && `أداء ممتاز بمعدل ${stats.overall}%. استمروا في هذا المستوى!`}
+                {stats.overall >= 70 && stats.overall < 85 && `أداء جيد بمعدل ${stats.overall}%. يمكن تحسينه بالتركيز على الملاحظات السلبية.`}
+                {stats.overall >= 50 && stats.overall < 70 && `الأداء متوسط (${stats.overall}%). يحتاج إلى مراجعة فورية للنقاط الضعيفة.`}
+                {stats.overall < 50 && stats.overall > 0 && `أداء يحتاج تدخّلاً عاجلاً (${stats.overall}%). راجعوا التقارير اليومية فوراً.`}
+              </div>
+            </div>
+
+            {/* رؤية #2: أفضل شركة */}
+            {companyPerf.length > 0 && (
+              <div style={{ padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 16 }}>🏆</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#B89968' }}>المتميّز</span>
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>
+                  <strong style={{ color: '#fff' }}>{companyPerf[0].fullName}</strong> تتصدر بنسبة <strong style={{ color: THEME.colors.success }}>{companyPerf[0].overall}%</strong>
+                </div>
+              </div>
+            )}
+
+            {/* رؤية #3: تحتاج تحسين */}
+            {companyPerf.length > 1 && companyPerf[companyPerf.length - 1].overall < 75 && (
+              <div style={{ padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 16 }}>⚡</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#B89968' }}>يحتاج متابعة</span>
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>
+                  <strong style={{ color: '#fff' }}>{companyPerf[companyPerf.length - 1].fullName}</strong> بنسبة <strong style={{ color: THEME.colors.warning }}>{companyPerf[companyPerf.length - 1].overall}%</strong> - يُنصح بزيارة ميدانية.
+                </div>
+              </div>
+            )}
+
+            {/* رؤية #4: عدد الملاحظات السلبية */}
+            {stats.negatives > 0 && (
+              <div style={{ padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 16 }}>📋</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#B89968' }}>نقاط للمتابعة</span>
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>
+                  <strong style={{ color: THEME.colors.warning }}>{stats.negatives}</strong> ملاحظة سلبية مسجّلة. {stats.notes < stats.negatives && `(${stats.negatives - stats.notes} منها بدون شرح)`}
+                </div>
+              </div>
+            )}
+
+            {/* رؤية #5: تقدّم التعبئة */}
+            <div style={{ padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 16 }}>📊</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#B89968' }}>التغطية</span>
+              </div>
+              <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>
+                تم تسجيل <strong style={{ color: '#fff' }}>{stats.total}</strong> تقييم
+                {teamPerf.length > 0 && `، ${teamPerf[0].fullName} هو الأكثر متابعة.`}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {stats.total === 0 && (
         <Card padding={30} style={{ textAlign: 'center' }}>
@@ -525,12 +639,67 @@ function ValueSelector({ criterion, value, onChange, disabled }) {
 }
 
 function CriterionCard({ criterion, index, value, note, onValueChange, onNoteChange, disabled }) {
-  const isFilled = value !== null && value !== undefined && value !== '';
-  const numValue = typeof value === 'string' && !isNaN(parseFloat(value)) ? parseFloat(value) : value;
-  const isNegative = value === 'no' || (typeof numValue === 'number' && criterion.type === 'scale' && numValue < 3);
-  const isNA = value === 'na';
+  // State محلي للقيمة والملاحظة - يتحدث فوراً للمستخدم
+  const [localNote, setLocalNote] = useState(note || '');
+  const [localValue, setLocalValue] = useState(value);
+
+  // مزامنة مع البيانات الخارجية فقط إذا تغيرت من خارج المكون
+  // (مثلاً عندما يتم تحميل البيانات لأول مرة)
+  const lastExternalNoteRef = useRef(note);
+  const lastExternalValueRef = useRef(value);
+
+  useEffect(() => {
+    // فقط إذا تغير من الخارج بشكل حقيقي وليس انعكاسنا
+    if (note !== lastExternalNoteRef.current && note !== localNote) {
+      setLocalNote(note || '');
+    }
+    lastExternalNoteRef.current = note;
+  }, [note]);
+
+  useEffect(() => {
+    if (value !== lastExternalValueRef.current && value !== localValue) {
+      setLocalValue(value);
+    }
+    lastExternalValueRef.current = value;
+  }, [value]);
+
+  // Debounce: حفظ الملاحظة بعد 800ms من التوقف
+  useEffect(() => {
+    if (localNote === (note || '')) return; // لا داعي للحفظ
+    const timer = setTimeout(() => {
+      onNoteChange(localNote);
+      lastExternalNoteRef.current = localNote;
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [localNote]);
+
+  // للقيم الرقمية: نفس الفكرة - debounce
+  const numberTimerRef = useRef(null);
+  const handleNumberChange = (newVal) => {
+    setLocalValue(newVal);
+    if (numberTimerRef.current) clearTimeout(numberTimerRef.current);
+    numberTimerRef.current = setTimeout(() => {
+      onValueChange(newVal);
+      lastExternalValueRef.current = newVal;
+    }, 800);
+  };
+
+  // للأزرار (yesno, scale): حفظ فوري لأن المستخدم لا يكتب
+  const handleButtonChange = (newVal) => {
+    setLocalValue(newVal);
+    lastExternalValueRef.current = newVal;
+    onValueChange(newVal);
+  };
+
+  const effectiveValue = localValue;
+  const effectiveNote = localNote;
+
+  const isFilled = effectiveValue !== null && effectiveValue !== undefined && effectiveValue !== '';
+  const numValue = typeof effectiveValue === 'string' && !isNaN(parseFloat(effectiveValue)) ? parseFloat(effectiveValue) : effectiveValue;
+  const isNegative = effectiveValue === 'no' || (typeof numValue === 'number' && criterion.type === 'scale' && numValue < 3);
+  const isNA = effectiveValue === 'na';
   const noteRequired = criterion.noteRequired === 'always' || (criterion.noteRequired === 'low' && isNegative) || isNA;
-  const noteMissing = noteRequired && !note?.trim();
+  const noteMissing = noteRequired && !effectiveNote?.trim();
 
   return (
     <div style={{ background: isFilled ? (isNA ? THEME.colors.bgSecondary : '#FDFCF8') : THEME.colors.surface, border: `1.5px solid ${noteMissing ? THEME.colors.warning : isFilled ? '#E8E0D0' : THEME.colors.border}`, borderRadius: THEME.radius.md, padding: 16, opacity: disabled ? 0.6 : 1 }}>
@@ -549,15 +718,23 @@ function CriterionCard({ criterion, index, value, note, onValueChange, onNoteCha
           </div>
         </div>
       </div>
-      <ValueSelector criterion={criterion} value={value} onChange={onValueChange} disabled={disabled} />
-      {(noteRequired || note) && (
+      <ValueSelector
+        criterion={criterion}
+        value={effectiveValue}
+        onChange={criterion.type === 'number' ? handleNumberChange : handleButtonChange}
+        disabled={disabled}
+      />
+      {(noteRequired || effectiveNote) && (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px dashed ${THEME.colors.border}` }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: noteMissing ? THEME.colors.warning : THEME.colors.textSecondary, marginBottom: 6 }}>
             <MessageSquare size={14} />
             ملاحظة {noteRequired && <span style={{ color: THEME.colors.danger }}>*</span>}
             {noteMissing && <span style={{ fontSize: 11, marginRight: 'auto' }}>(مطلوبة)</span>}
           </label>
-          <textarea value={note || ''} onChange={e => onNoteChange(e.target.value)} disabled={disabled}
+          <textarea
+            value={effectiveNote}
+            onChange={e => setLocalNote(e.target.value)}
+            disabled={disabled}
             placeholder={isNA ? 'اذكر سبب عدم انطباق المعيار...' : isNegative ? 'اشرح سبب التقييم السلبي...' : 'أضف ملاحظة (اختياري)...'}
             rows={2}
             style={{ width: '100%', padding: '10px 12px', borderRadius: THEME.radius.md, border: `1.5px solid ${noteMissing ? THEME.colors.warning : THEME.colors.border}`, fontSize: 13, direction: 'rtl', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}/>
@@ -580,21 +757,36 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, refreshEvalu
 
   const company = companies?.find(c => c.id === user.companyId);
 
-  // فحص هل الجلستان مفعّلتان لهذا المستخدم
-  const sessionsEnabled = useMemo(() => {
-    return isSessionsEnabledForUser(user, settings, teams.map(t => t.id));
+  // فحص هل الجلستان مفعّلتان لهذا الفريق بالذات
+  const sessionsEnabledForActiveTeam = useMemo(() => {
+    if (!activeTeamId) return false;
+    return isSessionsEnabledForTeam(user, settings, activeTeamId);
+  }, [user, settings, activeTeamId]);
+
+  // قائمة معرّفات الفرق التي تعمل بنظام الجلستين
+  const teamsWithSessions = useMemo(() => {
+    const result = new Set();
+    teams.forEach(t => {
+      if (isSessionsEnabledForTeam(user, settings, t.id)) result.add(t.id);
+    });
+    return result;
   }, [user, settings, teams]);
 
   const activeTeam = teams.find(t => t.id === activeTeamId);
   const activeIdx = DATES.findIndex(d => d.id === activeDate);
 
-  // منطق الإغلاق المختلف حسب وضع الجلسات
+  // إعادة ضبط الجلسة عند تغيير الفريق
+  useEffect(() => {
+    if (!sessionsEnabledForActiveTeam) setActiveSession(1);
+  }, [sessionsEnabledForActiveTeam, activeTeamId]);
+
+  // منطق الإغلاق
   const closedInfo = useMemo(() => {
-    if (sessionsEnabled) {
+    if (sessionsEnabledForActiveTeam) {
       return isSessionClosed(activeSession, activeDate, settings);
     }
     return isEvaluationClosed(activeDate, settings);
-  }, [sessionsEnabled, activeSession, activeDate, settings]);
+  }, [sessionsEnabledForActiveTeam, activeSession, activeDate, settings]);
 
   const isLocked = closedInfo.closed;
   const teamActive = activeTeam ? isTeamActiveOnDate(activeTeam, activeDate) : false;
@@ -611,17 +803,22 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, refreshEvalu
       <EntryReportPage
         user={user} company={company} teams={teams}
         settings={settings} evaluations={evaluations}
-        activeDate={activeDate} activeSession={sessionsEnabled ? activeSession : null}
+        activeDate={activeDate}
+        teamsWithSessions={teamsWithSessions}
         onBack={() => setShowReport(false)} toast={toast}
       />
     );
   }
 
-  const getEvaluation = (criterionId) => evaluations.find(e =>
-    e.company_id === user.companyId && e.section === user.section &&
-    e.date_id === activeDate && e.criterion_id === criterionId &&
-    (e.session || 1) === activeSession
-  );
+  const getEvaluation = (criterionId) => {
+    // إذا الفريق له جلستان، نستخدم activeSession، وإلا نستخدم 1 دائماً
+    const sessionToUse = sessionsEnabledForActiveTeam ? activeSession : 1;
+    return evaluations.find(e =>
+      e.company_id === user.companyId && e.section === user.section &&
+      e.date_id === activeDate && e.criterion_id === criterionId &&
+      (e.session || 1) === sessionToUse
+    );
+  };
 
   const showSavedBriefly = useCallback(() => {
     setSavedIndicator(true);
@@ -630,12 +827,13 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, refreshEvalu
 
   const saveEvaluation = async (criterionId, updates) => {
     if (isLocked) { toast.show(closedInfo.reason || 'مغلق', 'warning'); return; }
+    const sessionToUse = sessionsEnabledForActiveTeam ? activeSession : 1;
     const existing = getEvaluation(criterionId);
     setSaving(true);
     try {
       await api.upsertEvaluation({
         userId: user.id, companyId: user.companyId, section: user.section,
-        dateId: activeDate, criterionId, session: activeSession,
+        dateId: activeDate, criterionId, session: sessionToUse,
         value: updates.value !== undefined ? updates.value : existing?.value,
         note: updates.note !== undefined ? updates.note : existing?.note,
       });
@@ -650,28 +848,47 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, refreshEvalu
     teams.forEach(t => {
       if (!isTeamActiveOnDate(t, activeDate)) { map[t.id] = { filled: 0, total: 0, inactive: true }; return; }
       const visible = t.criteria.filter(c => shouldShowCriterion(c, t, activeDate, user.section));
+      const teamHasSessions = teamsWithSessions.has(t.id);
+      // للفريق ذي الجلستين، الإنجاز يُحسب للجلسة الحالية
+      // للفرق الأخرى، الإنجاز ثابت (جلسة 1)
+      const sessionForCount = teamHasSessions ? activeSession : 1;
       let filled = 0;
       visible.forEach(c => {
         const e = evaluations.find(ev =>
           ev.company_id === user.companyId && ev.section === user.section &&
           ev.date_id === activeDate && ev.criterion_id === c.id &&
-          (ev.session || 1) === activeSession
+          (ev.session || 1) === sessionForCount
         );
         if (e?.value !== undefined && e?.value !== null && e?.value !== '') filled++;
       });
-      map[t.id] = { filled, total: visible.length, inactive: false };
+      map[t.id] = { filled, total: visible.length, inactive: false, hasSessions: teamHasSessions };
     });
     return map;
-  }, [evaluations, activeDate, user, teams, activeSession]);
+  }, [evaluations, activeDate, user, teams, activeSession, teamsWithSessions]);
 
-  // إجمالي الإنجاز عبر كل الفرق (للتحقق من الإكمال)
+  // إجمالي الإنجاز (للتحقق من شرط الإكمال)
+  // المنطق: لكل فريق، إذا كان له جلستان نحتاج إكمال الجلستين معاً، وإلا الجلسة 1 فقط
   const overallProgress = useMemo(() => {
     let totalFilled = 0, totalCount = 0;
-    Object.values(progressMap).forEach(p => {
-      if (!p.inactive) { totalFilled += p.filled; totalCount += p.total; }
+    teams.forEach(t => {
+      if (!isTeamActiveOnDate(t, activeDate)) return;
+      const visible = t.criteria.filter(c => shouldShowCriterion(c, t, activeDate, user.section));
+      const hasSessions = teamsWithSessions.has(t.id);
+      const sessionsToCheck = hasSessions ? [1, 2] : [1];
+      sessionsToCheck.forEach(sNum => {
+        visible.forEach(c => {
+          totalCount++;
+          const e = evaluations.find(ev =>
+            ev.company_id === user.companyId && ev.section === user.section &&
+            ev.date_id === activeDate && ev.criterion_id === c.id &&
+            (ev.session || 1) === sNum
+          );
+          if (e?.value !== undefined && e?.value !== null && e?.value !== '') totalFilled++;
+        });
+      });
     });
     return { filled: totalFilled, total: totalCount, complete: totalCount > 0 && totalFilled === totalCount };
-  }, [progressMap]);
+  }, [evaluations, activeDate, user, teams, teamsWithSessions]);
 
   const currentProgress = progressMap[activeTeamId] || { filled: 0, total: 0 };
   const gregorianDate = useMemo(() => getGregorianDateForHijriDay(activeDate, settings.season_start_date), [activeDate, settings]);
@@ -708,22 +925,21 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, refreshEvalu
         </div>
       </Card>
 
-      {/* تبديل الجلسات (إذا مفعّلة) */}
-      {sessionsEnabled && (
+      {/* تبديل الجلسات (يظهر فقط إذا الفريق الحالي له جلستان) */}
+      {sessionsEnabledForActiveTeam && (
         <Card padding={12} style={{ marginBottom: 14, background: '#F0F7FF', border: `1.5px solid ${THEME.colors.info}33` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <Clock size={16} color={THEME.colors.info} />
             <span style={{ fontSize: 12, fontWeight: 700, color: THEME.colors.info }}>
-              التقييم في جلستين — اختر الجلسة
+              هذا الفريق يُقيَّم في جلستين — اختر الجلسة
             </span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {[
-              { num: 1, label: 'الجلسة الصباحية', time: (settings.session1_close_time || '12:00:00').slice(0, 5) },
-              { num: 2, label: 'الجلسة المسائية', time: (settings.session2_close_time || '22:00:00').slice(0, 5) },
+              { num: 1, label: 'الجلسة الصباحية', icon: '🌅' },
+              { num: 2, label: 'الجلسة المسائية', icon: '🌆' },
             ].map(s => {
               const selected = activeSession === s.num;
-              const sClosed = isSessionClosed(s.num, activeDate, settings);
               return (
                 <button key={s.num} onClick={() => setActiveSession(s.num)}
                   style={{
@@ -732,15 +948,10 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, refreshEvalu
                     color: selected ? '#fff' : THEME.colors.text,
                     border: `2px solid ${selected ? THEME.colors.info : THEME.colors.border}`,
                     borderRadius: THEME.radius.md, cursor: 'pointer',
-                    fontFamily: 'inherit', textAlign: 'right',
+                    fontFamily: 'inherit', textAlign: 'center',
+                    fontSize: 13, fontWeight: 700,
                   }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-                    {sClosed.closed && <Lock size={12} />}
-                    {s.label}
-                  </div>
-                  <div style={{ fontSize: 11, opacity: 0.8 }}>
-                    تغلق الساعة {s.time}
-                  </div>
+                  <span style={{ marginLeft: 6 }}>{s.icon}</span>{s.label}
                 </button>
               );
             })}
@@ -765,7 +976,7 @@ function DataEntryPage({ user, teams, settings, toast, evaluations, refreshEvalu
           </div>
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
-              تقرير {sessionsEnabled ? (activeSession === 1 ? 'الجلسة الصباحية' : 'الجلسة المسائية') : 'اليوم'}
+              تقرير اليوم
             </div>
             {overallProgress.complete ? (
               <div style={{ fontSize: 12, color: THEME.colors.success, fontWeight: 600 }}>

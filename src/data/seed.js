@@ -177,7 +177,12 @@ export function isEvaluationClosed(dateId, settings) {
  * التحقق هل الجلستان مفعّلتان لمستخدم معين
  * يأخذ بعين الاعتبار: قسم المستخدم، فرق محددة (إن وجدت)
  */
-export function isSessionsEnabledForUser(user, settings, teamIds = []) {
+/**
+ * هل الجلستان مفعّلتان لمستخدم في فريق معيّن؟
+ * - يفحص: قسم المستخدم، وهل هذا الفريق محدد في scope_teams (إن وُجد)
+ * - إذا scope_teams فارغ، يعتبر الكل
+ */
+export function isSessionsEnabledForTeam(user, settings, teamId) {
   if (!settings || settings.sessions_mode !== 'double') return false;
 
   // فحص نطاق القسم
@@ -185,24 +190,39 @@ export function isSessionsEnabledForUser(user, settings, teamIds = []) {
   if (scopeSec === 'men' && user?.section !== 'رجال') return false;
   if (scopeSec === 'women' && user?.section !== 'نساء') return false;
 
-  // فحص نطاق الفرق
+  // فحص نطاق الفرق: إذا تم تحديد فرق معينة، يجب أن يكون هذا الفريق منها
   const scopeTeams = settings.sessions_scope_teams || [];
-  if (scopeTeams.length > 0 && teamIds.length > 0) {
-    // إذا كانت هناك قائمة فرق محددة، يجب أن يكون أحد فرق المستخدم في القائمة
-    const hasMatch = teamIds.some(tid => scopeTeams.includes(tid));
-    if (!hasMatch) return false;
+  if (scopeTeams.length > 0 && teamId) {
+    if (!scopeTeams.includes(teamId)) return false;
   }
 
   return true;
 }
 
 /**
- * يتحقق هل جلسة معينة (1 أو 2) مغلقة بناءً على الوقت
+ * @deprecated استخدم isSessionsEnabledForTeam بدلاً منه
+ */
+export function isSessionsEnabledForUser(user, settings, teamIds = []) {
+  if (!settings || settings.sessions_mode !== 'double') return false;
+  const scopeSec = settings.sessions_scope_section || 'all';
+  if (scopeSec === 'men' && user?.section !== 'رجال') return false;
+  if (scopeSec === 'women' && user?.section !== 'نساء') return false;
+  const scopeTeams = settings.sessions_scope_teams || [];
+  if (scopeTeams.length > 0 && teamIds.length > 0) {
+    const hasMatch = teamIds.some(tid => scopeTeams.includes(tid));
+    if (!hasMatch) return false;
+  }
+  return true;
+}
+
+/**
+ * هل جلسة معينة (1 أو 2) مغلقة لتاريخ معيّن؟
+ * المنطق الجديد: الجلستان متاحتان كاملاً طوال اليوم.
+ * تُغلقان فقط إذا انتهى اليوم (يوم سابق) أو أُغلق يدوياً.
  */
 export function isSessionClosed(sessionNum, dateId, settings) {
   if (!settings || !settings.season_start_date) return { closed: false, reason: '' };
 
-  // فحص الإغلاق اليدوي
   const manualClosed = settings.manually_closed_dates || [];
   if (manualClosed.includes(dateId)) {
     return { closed: true, reason: 'مغلق يدوياً من المدير' };
@@ -212,47 +232,10 @@ export function isSessionClosed(sessionNum, dateId, settings) {
   const dateNum = parseInt(dateId);
   const todayNum = parseInt(todayId);
 
-  // أيام مستقبلية
   if (dateNum > todayNum) return { closed: true, reason: 'يوم قادم' };
-
-  // أيام سابقة (تغلق فوراً)
   if (dateNum < todayNum) return { closed: true, reason: 'يوم سابق' };
 
-  // اليوم الحالي - فحص الوقت
-  const now = new Date();
-  const gregDate = getGregorianDateForHijriDay(dateId, settings.season_start_date);
-  if (!gregDate) return { closed: false, reason: '' };
-
-  const dayStart = new Date(gregDate);
-  dayStart.setHours(0, 0, 0, 0);
-
-  // وقت إغلاق الجلسة المطلوبة
-  let closeTime;
-  if (sessionNum === 1) {
-    closeTime = settings.session1_close_time || '12:00:00';
-  } else {
-    closeTime = settings.session2_close_time || '22:00:00';
-  }
-
-  const [h, m] = closeTime.split(':');
-  const closingPoint = new Date(dayStart);
-  closingPoint.setHours(parseInt(h), parseInt(m || '0'), 0, 0);
-
-  if (now >= closingPoint) {
-    return { closed: true, reason: `انتهى وقت الجلسة ${sessionNum === 1 ? 'الأولى' : 'الثانية'} (${closeTime.slice(0, 5)})` };
-  }
-
-  // الجلسة الثانية لا تفتح إلا بعد انتهاء الجلسة الأولى
-  if (sessionNum === 2) {
-    const session1Close = settings.session1_close_time || '12:00:00';
-    const [h1, m1] = session1Close.split(':');
-    const session1End = new Date(dayStart);
-    session1End.setHours(parseInt(h1), parseInt(m1 || '0'), 0, 0);
-    if (now < session1End) {
-      return { closed: true, reason: `الجلسة الثانية تبدأ بعد ${session1Close.slice(0, 5)}` };
-    }
-  }
-
+  // اليوم الحالي: مفتوح دائماً (لا قيود توقيت على الجلسة)
   return { closed: false, reason: '' };
 }
 
