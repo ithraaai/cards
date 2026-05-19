@@ -188,7 +188,7 @@ export const INITIAL_TEAMS = [
 // =================================================================
 // دالة مساعدة: هل يجب عرض المعيار في هذا اليوم؟
 // =================================================================
-export function shouldShowCriterion(criterion, team, currentDateId) {
+export function shouldShowCriterion(criterion, team, currentDateId, userSection = null) {
   // إذا التكرار يومي → يظهر دائماً ابتداءً من تاريخ بدء الفريق
   // إذا التكرار أول يوم فقط → يظهر في يوم بدء الفريق فقط
 
@@ -197,6 +197,13 @@ export function shouldShowCriterion(criterion, team, currentDateId) {
 
   // قبل تاريخ بدء الفريق: لا يظهر
   if (current < teamStart) return false;
+
+  // فحص نطاق القسم
+  if (userSection) {
+    const scope = criterion.sectionScope || 'all';
+    if (scope === 'men' && userSection !== 'رجال') return false;
+    if (scope === 'women' && userSection !== 'نساء') return false;
+  }
 
   if (criterion.repeat === 'first_day_only') {
     // يظهر فقط في تاريخ بدء الفريق

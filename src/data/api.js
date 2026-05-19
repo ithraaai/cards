@@ -1,20 +1,15 @@
 // =================================================================
 // طبقة API — كل عمليات قاعدة البيانات
 // =================================================================
-// هذا الملف يحتوي على كل الدوال التي تتعامل مع Supabase.
-// التطبيق يستدعي هذه الدوال بدلاً من التعامل مع قاعدة البيانات مباشرة.
-// =================================================================
-
 import { supabase } from './supabase.js';
 
 // =================================================================
-// USERS - المستخدمون
+// USERS
 // =================================================================
 
 export async function getAllUsers() {
   const { data, error } = await supabase
-    .from('users')
-    .select('*')
+    .from('users').select('*')
     .order('created_at', { ascending: true });
   if (error) throw error;
   return data;
@@ -22,8 +17,7 @@ export async function getAllUsers() {
 
 export async function findUserByUsername(username) {
   const { data, error } = await supabase
-    .from('users')
-    .select('*')
+    .from('users').select('*')
     .eq('username', username.toLowerCase())
     .eq('active', true)
     .maybeSingle();
@@ -32,20 +26,18 @@ export async function findUserByUsername(username) {
 }
 
 export async function createUser(user) {
-  const payload = {
-    name: user.name,
-    username: user.username.toLowerCase(),
-    role: user.role,
-    company_id: user.companyId || null,
-    section: user.section || null,
-    phone: user.phone || null,
-    active: user.active !== false,
-  };
   const { data, error } = await supabase
     .from('users')
-    .insert(payload)
-    .select()
-    .single();
+    .insert({
+      name: user.name,
+      username: user.username.toLowerCase(),
+      role: user.role,
+      company_id: user.companyId || null,
+      section: user.section || null,
+      phone: user.phone || null,
+      active: user.active !== false,
+    })
+    .select().single();
   if (error) throw error;
   return data;
 }
@@ -60,15 +52,9 @@ export async function updateUser(id, updates) {
     phone: updates.phone || null,
     updated_at: new Date().toISOString(),
   };
-  // إزالة undefined fields
   Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
-
   const { data, error } = await supabase
-    .from('users')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
+    .from('users').update(payload).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
@@ -77,9 +63,7 @@ export async function setUserActive(id, active) {
   const { data, error } = await supabase
     .from('users')
     .update({ active, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
+    .eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
@@ -91,13 +75,12 @@ export async function deleteUser(id) {
 }
 
 // =================================================================
-// COMPANIES - الشركات
+// COMPANIES
 // =================================================================
 
 export async function getAllCompanies() {
   const { data, error } = await supabase
-    .from('companies')
-    .select('*')
+    .from('companies').select('*')
     .order('created_at', { ascending: true });
   if (error) throw error;
   return data;
@@ -112,8 +95,7 @@ export async function createCompany(company) {
       contract: company.contract || null,
       active: true,
     })
-    .select()
-    .single();
+    .select().single();
   if (error) throw error;
   return data;
 }
@@ -127,9 +109,7 @@ export async function updateCompany(id, updates) {
       contract: updates.contract || null,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', id)
-    .select()
-    .single();
+    .eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
@@ -138,9 +118,7 @@ export async function setCompanyActive(id, active) {
   const { data, error } = await supabase
     .from('companies')
     .update({ active, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
+    .eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
@@ -152,53 +130,73 @@ export async function deleteCompany(id) {
 }
 
 // =================================================================
-// SETTINGS - الإعدادات
+// SETTINGS — مع الإعدادات الجديدة
 // =================================================================
 
 export async function getSettings() {
   const { data, error } = await supabase
-    .from('settings')
-    .select('*')
-    .eq('id', 1)
-    .maybeSingle();
+    .from('settings').select('*').eq('id', 1).maybeSingle();
   if (error) throw error;
   return data;
 }
 
 export async function updateSettings(updates) {
+  const payload = { updated_at: new Date().toISOString() };
+  if (updates.seasonStartDate !== undefined) payload.season_start_date = updates.seasonStartDate;
+  if (updates.closingMode !== undefined) payload.closing_mode = updates.closingMode;
+  if (updates.closingTime !== undefined) payload.closing_time = updates.closingTime;
+  if (updates.unifiedStartDateId !== undefined) payload.unified_start_date_id = updates.unifiedStartDateId;
+  if (updates.manuallyClosedDates !== undefined) payload.manually_closed_dates = updates.manuallyClosedDates;
+  if (updates.sessionsMode !== undefined) payload.sessions_mode = updates.sessionsMode;
+  if (updates.session1CloseTime !== undefined) payload.session1_close_time = updates.session1CloseTime;
+  if (updates.session2CloseTime !== undefined) payload.session2_close_time = updates.session2CloseTime;
+  if (updates.sessionsScopeSection !== undefined) payload.sessions_scope_section = updates.sessionsScopeSection;
+  if (updates.sessionsScopeTeams !== undefined) payload.sessions_scope_teams = updates.sessionsScopeTeams;
+
   const { data, error } = await supabase
-    .from('settings')
-    .update({
-      season_start_date: updates.seasonStartDate || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', 1)
-    .select()
-    .single();
+    .from('settings').update(payload).eq('id', 1).select().single();
   if (error) throw error;
   return data;
 }
 
+// تطبيق تاريخ بدء موحد على كل الفرق
+export async function applyUnifiedStartDateToAllTeams(startDateId) {
+  const { data, error } = await supabase
+    .from('teams')
+    .update({ start_date_id: startDateId, updated_at: new Date().toISOString() })
+    .neq('id', '00000000-0000-0000-0000-000000000000') // كل الصفوف
+    .select();
+  if (error) throw error;
+  return data;
+}
+
+// تبديل حالة الإغلاق اليدوي ليوم محدد
+export async function toggleManualCloseForDate(dateId) {
+  const settings = await getSettings();
+  const closed = settings.manually_closed_dates || [];
+  const newClosed = closed.includes(dateId)
+    ? closed.filter(d => d !== dateId)
+    : [...closed, dateId];
+  return await updateSettings({ manuallyClosedDates: newClosed });
+}
+
 // =================================================================
-// TEAMS - الفرق
+// TEAMS - تحميل سريع متوازي
 // =================================================================
 
 export async function getAllTeamsWithCriteria() {
-  // جلب الفرق
-  const { data: teams, error: teamsError } = await supabase
-    .from('teams')
-    .select('*')
-    .order('sort_order', { ascending: true });
-  if (teamsError) throw teamsError;
+  // تحميل متوازي للسرعة
+  const [teamsResult, criteriaResult] = await Promise.all([
+    supabase.from('teams').select('*').order('sort_order', { ascending: true }),
+    supabase.from('criteria').select('*').order('sort_order', { ascending: true }),
+  ]);
 
-  // جلب كل المعايير
-  const { data: criteria, error: criteriaError } = await supabase
-    .from('criteria')
-    .select('*')
-    .order('sort_order', { ascending: true });
-  if (criteriaError) throw criteriaError;
+  if (teamsResult.error) throw teamsResult.error;
+  if (criteriaResult.error) throw criteriaResult.error;
 
-  // دمج المعايير مع فرقها
+  const teams = teamsResult.data;
+  const criteria = criteriaResult.data;
+
   return teams.map(team => ({
     ...team,
     startDateId: team.start_date_id,
@@ -211,6 +209,7 @@ export async function getAllTeamsWithCriteria() {
         unit: c.unit,
         noteRequired: c.note_required,
         repeat: c.repeat_type,
+        sectionScope: c.section_scope || 'all',
       })),
   }));
 }
@@ -223,8 +222,7 @@ export async function createTeam(team) {
       description: team.description || null,
       start_date_id: team.startDateId || '1',
     })
-    .select()
-    .single();
+    .select().single();
   if (error) throw error;
   return data;
 }
@@ -234,13 +232,8 @@ export async function updateTeam(id, updates) {
   if (updates.name !== undefined) payload.name = updates.name;
   if (updates.description !== undefined) payload.description = updates.description;
   if (updates.startDateId !== undefined) payload.start_date_id = updates.startDateId;
-
   const { data, error } = await supabase
-    .from('teams')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
+    .from('teams').update(payload).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
@@ -252,7 +245,7 @@ export async function deleteTeam(id) {
 }
 
 // =================================================================
-// CRITERIA - المعايير
+// CRITERIA
 // =================================================================
 
 export async function createCriterion(teamId, criterion) {
@@ -265,9 +258,9 @@ export async function createCriterion(teamId, criterion) {
       unit: criterion.unit || null,
       note_required: criterion.noteRequired || 'no',
       repeat_type: criterion.repeat || 'daily',
+      section_scope: criterion.sectionScope || 'all',
     })
-    .select()
-    .single();
+    .select().single();
   if (error) throw error;
   return data;
 }
@@ -279,13 +272,9 @@ export async function updateCriterion(id, updates) {
   if (updates.unit !== undefined) payload.unit = updates.unit;
   if (updates.noteRequired !== undefined) payload.note_required = updates.noteRequired;
   if (updates.repeat !== undefined) payload.repeat_type = updates.repeat;
-
+  if (updates.sectionScope !== undefined) payload.section_scope = updates.sectionScope;
   const { data, error } = await supabase
-    .from('criteria')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
+    .from('criteria').update(payload).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
@@ -297,38 +286,23 @@ export async function deleteCriterion(id) {
 }
 
 // =================================================================
-// EVALUATIONS - التقييمات
+// EVALUATIONS
 // =================================================================
 
-export async function getEvaluationsForDate(dateId) {
-  const { data, error } = await supabase
-    .from('evaluations')
-    .select('*')
-    .eq('date_id', dateId);
-  if (error) throw error;
-  return data;
-}
-
-export async function getEvaluationsForCompanySection(companyId, section, dateId) {
-  const { data, error } = await supabase
-    .from('evaluations')
-    .select('*')
-    .eq('company_id', companyId)
-    .eq('section', section)
-    .eq('date_id', dateId);
-  if (error) throw error;
-  return data;
-}
-
 export async function getAllEvaluations() {
-  const { data, error } = await supabase
-    .from('evaluations')
-    .select('*');
+  const { data, error } = await supabase.from('evaluations').select('*');
   if (error) throw error;
   return data;
 }
 
-// upsert: يُدخل أو يُحدّث حسب وجود السجل
+export async function getEvaluationsForDateRange(startDateId, endDateId) {
+  const { data, error } = await supabase
+    .from('evaluations').select('*')
+    .gte('date_id', startDateId).lte('date_id', endDateId);
+  if (error) throw error;
+  return data;
+}
+
 export async function upsertEvaluation(evaluation) {
   const payload = {
     user_id: evaluation.userId,
@@ -336,97 +310,71 @@ export async function upsertEvaluation(evaluation) {
     section: evaluation.section,
     date_id: evaluation.dateId,
     criterion_id: evaluation.criterionId,
+    session: evaluation.session || 1,
     value: evaluation.value !== undefined && evaluation.value !== null ? String(evaluation.value) : null,
     note: evaluation.note || null,
     updated_at: new Date().toISOString(),
   };
-
   const { data, error } = await supabase
     .from('evaluations')
-    .upsert(payload, {
-      onConflict: 'company_id,section,date_id,criterion_id',
-    })
-    .select()
-    .single();
+    .upsert(payload, { onConflict: 'company_id,section,date_id,criterion_id,session' })
+    .select().single();
   if (error) throw error;
   return data;
 }
 
 // =================================================================
-// SEED - تعبئة البيانات الأولية للفرق
+// SEED
 // =================================================================
 
 export async function seedTeamsIfEmpty(initialTeams) {
-  // تحقق هل توجد فرق
   const { count, error: countError } = await supabase
-    .from('teams')
-    .select('*', { count: 'exact', head: true });
+    .from('teams').select('*', { count: 'exact', head: true });
   if (countError) throw countError;
 
-  if (count > 0) return false; // الفرق موجودة، لا نفعل شيئاً
+  if (count > 0) return false;
 
-  // إنشاء الفرق ومعاييرها
   for (let i = 0; i < initialTeams.length; i++) {
     const team = initialTeams[i];
     const { data: newTeam, error: teamError } = await supabase
       .from('teams')
       .insert({
-        name: team.name,
-        description: team.description,
-        start_date_id: team.startDateId,
-        sort_order: i,
+        name: team.name, description: team.description,
+        start_date_id: team.startDateId, sort_order: i,
       })
-      .select()
-      .single();
+      .select().single();
     if (teamError) throw teamError;
 
-    // إنشاء معايير الفريق
     const criteriaToInsert = team.criteria.map((c, idx) => ({
-      team_id: newTeam.id,
-      name: c.name,
-      type: c.type,
-      unit: c.unit || null,
-      note_required: c.noteRequired || 'no',
-      repeat_type: c.repeat || 'daily',
-      sort_order: idx,
+      team_id: newTeam.id, name: c.name, type: c.type,
+      unit: c.unit || null, note_required: c.noteRequired || 'no',
+      repeat_type: c.repeat || 'daily', sort_order: idx,
+      section_scope: c.sectionScope || 'all',
     }));
 
     if (criteriaToInsert.length > 0) {
-      const { error: critError } = await supabase
-        .from('criteria')
-        .insert(criteriaToInsert);
+      const { error: critError } = await supabase.from('criteria').insert(criteriaToInsert);
       if (critError) throw critError;
     }
   }
-
   return true;
 }
 
 // =================================================================
-// نموذج: تحويل بيانات قاعدة البيانات لصيغة التطبيق
+// تحويلات
 // =================================================================
 
-// تحويل user من DB إلى صيغة التطبيق
 export function dbUserToApp(dbUser) {
   return {
-    id: dbUser.id,
-    name: dbUser.name,
-    username: dbUser.username,
-    role: dbUser.role,
-    companyId: dbUser.company_id,
-    section: dbUser.section,
-    phone: dbUser.phone,
-    active: dbUser.active,
+    id: dbUser.id, name: dbUser.name, username: dbUser.username,
+    role: dbUser.role, companyId: dbUser.company_id, section: dbUser.section,
+    phone: dbUser.phone, active: dbUser.active,
   };
 }
 
-// تحويل company من DB إلى صيغة التطبيق
 export function dbCompanyToApp(dbCompany) {
   return {
-    id: dbCompany.id,
-    name: dbCompany.name,
-    code: dbCompany.code,
-    contract: dbCompany.contract,
-    active: dbCompany.active,
+    id: dbCompany.id, name: dbCompany.name, code: dbCompany.code,
+    contract: dbCompany.contract, active: dbCompany.active,
   };
 }
