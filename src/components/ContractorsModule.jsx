@@ -22,11 +22,17 @@ export function ContractorsModule({ user, companies, toast }) {
   useEffect(() => {
     (async () => {
       try {
+        console.log('🔍 جاري تحميل المجالات...');
         const d = await cApi.getDomains();
-        setDomains(d);
+        console.log('✅ المجالات المُحمَّلة:', d);
+        if (!d || d.length === 0) {
+          console.warn('⚠️ المصفوفة فارغة! تحقق من Supabase.');
+          toast.show('لم يتم العثور على مجالات في قاعدة البيانات', 'warning');
+        }
+        setDomains(d || []);
       } catch (err) {
-        console.error(err);
-        toast.show('فشل تحميل المجالات', 'error');
+        console.error('❌ خطأ في تحميل المجالات:', err);
+        toast.show('فشل تحميل المجالات: ' + (err.message || 'خطأ غير معروف'), 'error');
       } finally { setLoading(false); }
     })();
   }, []);
