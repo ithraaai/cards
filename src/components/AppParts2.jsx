@@ -46,6 +46,7 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
       ...u,
       companyId: u.company_id || u.companyId || '',
       contractorCompanyId: u.contractor_company_id || u.contractorCompanyId || '',
+      pmoDomains: u.pmo_domains || u.pmoDomains || [],
     });
     setShowForm(true);
   };
@@ -58,15 +59,24 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
     if (dup) { toast.show('اسم المستخدم مستخدم مسبقاً', 'warning'); return; }
 
     let finalForm = { ...form };
-    if (form.role === 'admin' || form.role === 'dashboard') { finalForm.companyId = null; finalForm.section = null; finalForm.contractorCompanyId = null; }
-    else if (form.role === 'supervisor') { finalForm.companyId = null; finalForm.contractorCompanyId = null; }
-    else if (form.role === 'data_entry') { finalForm.contractorCompanyId = null; }
-    // مدير المشروع (PMO) - يرى الكل
-    else if (form.role === 'contractor_pmo') { finalForm.companyId = null; finalForm.section = null; finalForm.contractorCompanyId = null; }
+    if (form.role === 'admin' || form.role === 'dashboard') { finalForm.companyId = null; finalForm.section = null; finalForm.contractorCompanyId = null; finalForm.pmoDomains = null; }
+    else if (form.role === 'supervisor') { finalForm.companyId = null; finalForm.contractorCompanyId = null; finalForm.pmoDomains = null; }
+    else if (form.role === 'data_entry') { finalForm.contractorCompanyId = null; finalForm.pmoDomains = null; }
+    // مدير المشروع (PMO) - يحتاج اختيار مجالات
+    else if (form.role === 'contractor_pmo') {
+      finalForm.companyId = null;
+      finalForm.section = null;
+      finalForm.contractorCompanyId = null;
+      if (!form.pmoDomains || form.pmoDomains.length === 0) {
+        toast.show('يجب اختيار مجال واحد على الأقل لمدير المشروع', 'warning');
+        return;
+      }
+    }
     // مراقبو المتعهدين - يحتاجون contractor_company_id
     else if (form.role?.startsWith('contractor_monitor_')) {
       finalForm.companyId = null;
       finalForm.section = null;
+      finalForm.pmoDomains = null;
       if (!form.contractorCompanyId) {
         toast.show('يجب تحديد الشركة المُراقَبة لأدوار المراقبين', 'warning');
         return;
@@ -102,6 +112,7 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
     const needsContractorCompany = form.role === 'contractor_monitor_food'
       || form.role === 'contractor_monitor_transport'
       || form.role === 'contractor_monitor_security';
+    const needsPmoDomains = form.role === 'contractor_pmo';
     return (
       <Card padding={20}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
@@ -168,6 +179,42 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
               </select>
               <div style={{ fontSize: 11, color: THEME.colors.textTertiary, marginTop: 4 }}>
                 المراقب يتابع تنفيذ هذه الشركة في مجاله فقط
+              </div>
+            </div>
+          )}
+          {needsPmoDomains && (
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>المجالات المُدارة</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  { id: 'food', label: 'الإعاشة', color: '#E85D24' },
+                  { id: 'transport', label: 'النقل', color: '#185FA5' },
+                  { id: 'security', label: 'الحراسات', color: '#27500A' },
+                ].map(d => {
+                  const checked = (form.pmoDomains || []).includes(d.id);
+                  return (
+                    <label key={d.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                      background: checked ? `${d.color}15` : '#fff',
+                      border: `1.5px solid ${checked ? d.color : THEME.colors.border}`,
+                    }}>
+                      <input type="checkbox" checked={checked}
+                        onChange={e => {
+                          const current = form.pmoDomains || [];
+                          const next = e.target.checked
+                            ? [...current, d.id]
+                            : current.filter(id => id !== d.id);
+                          setForm(p => ({ ...p, pmoDomains: next }));
+                        }}
+                        style={{ width: 18, height: 18 }}/>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: checked ? d.color : THEME.colors.text }}>{d.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: 11, color: THEME.colors.textTertiary, marginTop: 6, lineHeight: 1.5 }}>
+                اختر مجالاً واحداً أو أكثر. اختيار الثلاثة = مدير مشاريع كامل.
               </div>
             </div>
           )}

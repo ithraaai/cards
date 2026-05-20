@@ -40,6 +40,7 @@ export async function createUser(user) {
         : user.role === 'contractor_monitor_transport' ? 'transport'
         : user.role === 'contractor_monitor_security' ? 'security'
         : null,
+      pmo_domains: user.role === 'contractor_pmo' && user.pmoDomains?.length > 0 ? user.pmoDomains : null,
       active: user.active !== false,
     })
     .select().single();
@@ -60,6 +61,7 @@ export async function updateUser(id, updates) {
       : updates.role === 'contractor_monitor_transport' ? 'transport'
       : updates.role === 'contractor_monitor_security' ? 'security'
       : null,
+    pmo_domains: updates.role === 'contractor_pmo' && updates.pmoDomains?.length > 0 ? updates.pmoDomains : null,
     updated_at: new Date().toISOString(),
   };
   Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);

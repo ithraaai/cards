@@ -278,28 +278,34 @@ function CriteriaPage({ domains, companies, onBack, toast }) {
 
       {/* فلتر المجال */}
       <Card padding={12} style={{ marginBottom: 14 }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: THEME.colors.textSecondary, marginLeft: 6 }}>المجال:</span>
-          {domains.map(d => {
-            const Icon = domainIcon(d.id);
-            const color = domainColor(d.id);
-            const active = selectedDomain === d.id;
-            return (
-              <button key={d.id} onClick={() => { setSelectedDomain(d.id); setSelectedChecklist(null); }}
-                style={{
-                  padding: '6px 12px',
-                  background: active ? color : '#fff',
-                  color: active ? '#fff' : color,
-                  border: `1.5px solid ${color}`,
-                  borderRadius: 8, fontSize: 12, fontWeight: 700,
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
-                }}>
-                <Icon size={14} />
-                {d.name_ar}
-              </button>
-            );
-          })}
-        </div>
+        {domains.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 20, fontSize: 13, color: THEME.colors.warning }}>
+            ⚠️ لم يتم العثور على مجالات. تأكد من تنفيذ ملف SQL "إصلاح-المجالات" على Supabase.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: THEME.colors.textSecondary, marginLeft: 6 }}>المجال:</span>
+            {domains.map(d => {
+              const Icon = domainIcon(d.id);
+              const color = domainColor(d.id);
+              const active = selectedDomain === d.id;
+              return (
+                <button key={d.id} onClick={() => { setSelectedDomain(d.id); setSelectedChecklist(null); }}
+                  style={{
+                    padding: '6px 12px',
+                    background: active ? color : '#fff',
+                    color: active ? '#fff' : color,
+                    border: `1.5px solid ${color}`,
+                    borderRadius: 8, fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
+                  }}>
+                  <Icon size={14} />
+                  {d.name_ar}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       {/* قائمتان: القوائم على اليمين، المعايير على اليسار */}
