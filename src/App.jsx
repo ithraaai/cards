@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   LayoutDashboard, ClipboardList, Settings, LogOut, Menu,
-  Users as UsersIcon, Building2, Eye, FileBarChart, Wifi,
+  Users as UsersIcon, Building2, Eye, FileBarChart, Wifi, Briefcase,
 } from 'lucide-react';
 
 import { Button } from './components/Button.jsx';
@@ -18,6 +18,8 @@ import {
 import {
   UsersPage, CompaniesPage, TeamsManagementPage, SettingsPage, ReportsPage,
 } from './components/AppParts2.jsx';
+
+import { ContractorsModule } from './components/ContractorsModule.jsx';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -119,16 +121,22 @@ export default function App() {
       companies: { id: 'companies', icon: Building2, label: 'إدارة الشركات' },
       teamsAdmin: { id: 'teamsAdmin', icon: Settings, label: 'إدارة الفرق' },
       settings: { id: 'settings', icon: Settings, label: 'إعدادات النظام' },
+      contractors: { id: 'contractors', icon: Briefcase, label: 'وحدة المتعهدين' },
     };
     switch (user.role) {
       case 'admin':
-        return [all.dashboard, all.reports, all.users, all.companies, all.teamsAdmin, all.settings];
+        return [all.dashboard, all.reports, all.contractors, all.users, all.companies, all.teamsAdmin, all.settings];
       case 'dashboard':
         return [all.dashboard, all.reports];
       case 'supervisor':
         return [all.supervisor];
       case 'data_entry':
         return [all.entry];
+      case 'contractor_monitor_food':
+      case 'contractor_monitor_transport':
+      case 'contractor_monitor_security':
+      case 'contractor_pmo':
+        return [all.contractors];
       default:
         return [];
     }
@@ -364,6 +372,9 @@ export default function App() {
             )}
             {page === 'settings' && (
               <SettingsPage settings={settings} teams={teams} refreshSettings={refreshSettings} toast={toast} />
+            )}
+            {page === 'contractors' && (
+              <ContractorsModule user={user} companies={companies} toast={toast} />
             )}
           </main>
         </div>

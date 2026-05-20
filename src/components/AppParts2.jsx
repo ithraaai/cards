@@ -52,6 +52,8 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
     let finalForm = { ...form };
     if (form.role === 'admin' || form.role === 'dashboard') { finalForm.companyId = null; finalForm.section = null; }
     else if (form.role === 'supervisor') finalForm.companyId = null;
+    // أدوار المتعهدين: لا تحتاج شركة ولا قسم
+    else if (form.role?.startsWith('contractor_')) { finalForm.companyId = null; finalForm.section = null; }
 
     setSaving(true);
     try {
@@ -93,10 +95,18 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>الصلاحية</label>
             <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
               style={{ width: '100%', padding: '12px 14px', fontSize: 15, borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`, direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff', fontFamily: 'inherit' }}>
-              <option value="admin">مدير النظام</option>
-              <option value="dashboard">عرض لوحة المتابعة</option>
-              <option value="data_entry">مدخل بيانات</option>
-              <option value="supervisor">مشرف المتابعة</option>
+              <optgroup label="النظام الأساسي (البطاقات)">
+                <option value="admin">مدير النظام</option>
+                <option value="dashboard">عرض لوحة المتابعة</option>
+                <option value="data_entry">مدخل بيانات</option>
+                <option value="supervisor">مشرف المتابعة</option>
+              </optgroup>
+              <optgroup label="وحدة المتعهدين">
+                <option value="contractor_monitor_food">مراقب الإعاشة</option>
+                <option value="contractor_monitor_transport">مراقب النقل</option>
+                <option value="contractor_monitor_security">مراقب الحراسات</option>
+                <option value="contractor_pmo">مدير المشروع (PMO)</option>
+              </optgroup>
             </select>
             <div style={{ fontSize: 11, color: THEME.colors.textTertiary, marginTop: 4 }}>{ROLES_CONFIG[form.role]?.description}</div>
           </div>

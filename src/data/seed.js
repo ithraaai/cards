@@ -40,7 +40,27 @@ export const ROLES_CONFIG = {
   dashboard: { label: 'عرض لوحة المتابعة', color: '#2C5282', description: 'الإدارة العليا لاستعراض التقارير' },
   data_entry: { label: 'مدخل بيانات', color: '#2D6A4F', description: 'إدخال التقييمات لشركة وقسم محددَين' },
   supervisor: { label: 'مشرف المتابعة', color: '#B86E1C', description: 'متابعة مدخلي البيانات في قسم محدد' },
+  contractor_monitor_food: { label: 'مراقب الإعاشة', color: '#E85D24', description: 'مراقبة تنفيذ عقود الإعاشة', module: 'contractors' },
+  contractor_monitor_transport: { label: 'مراقب النقل', color: '#185FA5', description: 'مراقبة تنفيذ عقود النقل', module: 'contractors' },
+  contractor_monitor_security: { label: 'مراقب الحراسات', color: '#27500A', description: 'مراقبة تنفيذ عقود الحراسات', module: 'contractors' },
+  contractor_pmo: { label: 'مدير المشروع (PMO)', color: '#4B1528', description: 'إدارة كاملة لوحدة المتعهدين', module: 'contractors' },
 };
+
+// الأدوار التي تنتمي لوحدة المتعهدين
+export const CONTRACTOR_ROLES = ['contractor_monitor_food', 'contractor_monitor_transport', 'contractor_monitor_security', 'contractor_pmo'];
+
+// هل المستخدم له صلاحية على وحدة المتعهدين؟
+export function hasContractorsAccess(user) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return CONTRACTOR_ROLES.includes(user.role);
+}
+
+// هل المستخدم له صلاحية على وحدة البطاقات (النظام الأساسي)؟
+export function hasCardsAccess(user) {
+  if (!user) return false;
+  return !CONTRACTOR_ROLES.includes(user.role);
+}
 
 export const SCALE_LABELS = {
   1: { text: 'ضعيف جداً', color: '#A83232', bg: '#F5D5D5' },
