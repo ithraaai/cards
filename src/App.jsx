@@ -20,6 +20,7 @@ import {
 } from './components/AppParts2.jsx';
 
 import { ContractorsModule } from './components/ContractorsModule.jsx';
+import { MonitorPage } from './components/MonitorPage.jsx';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -122,6 +123,7 @@ export default function App() {
       teamsAdmin: { id: 'teamsAdmin', icon: Settings, label: 'إدارة الفرق' },
       settings: { id: 'settings', icon: Settings, label: 'إعدادات النظام' },
       contractors: { id: 'contractors', icon: Briefcase, label: 'وحدة المتعهدين' },
+      monitor: { id: 'monitor', icon: ClipboardList, label: 'تعبئة المراقبة' },
     };
     switch (user.role) {
       case 'admin':
@@ -135,6 +137,7 @@ export default function App() {
       case 'contractor_monitor_food':
       case 'contractor_monitor_transport':
       case 'contractor_monitor_security':
+        return [all.monitor];
       case 'contractor_pmo':
         return [all.contractors];
       default:
@@ -375,6 +378,9 @@ export default function App() {
             )}
             {page === 'contractors' && (
               <ContractorsModule user={user} companies={companies} toast={toast} />
+            )}
+            {page === 'monitor' && (
+              <MonitorPage user={user} companies={companies} toast={toast} />
             )}
           </main>
         </div>

@@ -109,3 +109,114 @@ export async function getCompanyDomainSummary() {
   if (error) throw error;
   return data;
 }
+
+// =================================================================
+// جلسات التعبئة (المراقبون)
+// =================================================================
+
+// إنشاء جلسة جديدة (أو إرجاع جلسة موجودة لنفس الشركة/المجال/اليوم/القائمة)
+export async function getOrCreateSession({ companyId, domainId, checklistId, dateId, monitorId }) {
+  // ابحث عن جلسة موجودة (للقوائم اليومية: نفس اليوم. للجاهزية: قد تكون NULL)
+  const { data: existing, error: searchErr } = await supabase
+    .from('contract_evaluation_sessions')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('domain_id', domainId)
+    .eq('checklist_id', checklistId)
+    .eq('date_id', dateId || '')
+    .neq('status', 'approved')  // لو معتمدة، أنشئ جديدة
+    .maybeSingle();
+  if (searchErr) console.error('بحث الجلسة:', searchErr);
+
+  if (existing) return existing;
+
+  // أنشئ جلسة جديدة
+  const { data, error } = await supabase
+    .from('contract_evaluation_sessions')
+    .insert({
+      company_id: companyId,
+      domain_id: domainId,
+      checklist_id: checklistId,
+      date_id: dateId || null,
+      monitor_id: monitorId,
+      status: 'in_progress',
+    })
+    .select().single();
+  if (error) throw error;
+  return data;
+}
+
+// جلب الجلسات السابقة للمراقب
+export async function getMonitorSessions(monitorId, limit = 30) {
+  const { data, error } = await supabase
+    .from('contract_evaluation_sessions')
+    .select(`
+      *,
+      checklist:contract_checklists(name_ar, phase_id)
+    `)
+    .eq('monitor_id', monitorId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data;
+}
+
+// جلب التعبئات الحالية لجلسة
+export async function getSessionEvaluations(sessionId) {
+  const { data, error } = await supabase
+    .from('contract_evaluations')
+    .select('*')
+    .eq('session_id', sessionId);
+  if (error) throw error;
+  return data;
+}
+
+// حفظ تعبئة معيار (upsert)
+export async function saveEvaluation({ sessionId, criterionId, status, note, valueText, valueNumber, valueBool, filledBy }) {
+  const { data, error } = await supabase
+    .from('contract_evaluations')
+    .upsert({
+      session_id: sessionId,
+      criterion_id: criterionId,
+      status: status || null,
+      note: note || null,
+      value_text: valueText || null,
+      value_number: valueNumber != null ? valueNumber : null,
+      value_bool: valueBool != null ? valueBool : null,
+      filled_by: filledBy,
+      filled_at: new Date().toISOString(),
+    }, { onConflict: 'session_id,criterion_id' })
+    .select().single();
+  if (error) throw error;
+  // تحديث عدّاد الجلسة
+  await refreshSessionCounts(sessionId);
+  return data;
+}
+
+// تحديث الإحصاءات في الجلسة
+async function refreshSessionCounts(sessionId) {
+  const { data: evals } = await supabase
+    .from('contract_evaluations').select('status').eq('session_id', sessionId);
+  if (!evals) return;
+  const compliant = evals.filter(e => e.status === 'compliant').length;
+  const violation = evals.filter(e => e.status === 'violation').length;
+  await supabase
+    .from('contract_evaluation_sessions')
+    .update({
+      total_items: evals.length,
+      compliant_items: compliant,
+      violation_items: violation,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', sessionId);
+}
+
+// إكمال الجلسة (submit)
+export async function submitSession(sessionId) {
+  const { data, error } = await supabase
+    .from('contract_evaluation_sessions')
+    .update({ status: 'submitted', submitted_at: new Date().toISOString() })
+    .eq('id', sessionId).select().single();
+  if (error) throw error;
+  return data;
+}
