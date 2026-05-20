@@ -35,6 +35,11 @@ export async function createUser(user) {
       company_id: user.companyId || null,
       section: user.section || null,
       phone: user.phone || null,
+      contractor_company_id: user.contractorCompanyId || null,
+      contractor_scope_domain: user.role === 'contractor_monitor_food' ? 'food'
+        : user.role === 'contractor_monitor_transport' ? 'transport'
+        : user.role === 'contractor_monitor_security' ? 'security'
+        : null,
       active: user.active !== false,
     })
     .select().single();
@@ -50,6 +55,11 @@ export async function updateUser(id, updates) {
     company_id: updates.companyId || null,
     section: updates.section || null,
     phone: updates.phone || null,
+    contractor_company_id: updates.contractorCompanyId || null,
+    contractor_scope_domain: updates.role === 'contractor_monitor_food' ? 'food'
+      : updates.role === 'contractor_monitor_transport' ? 'transport'
+      : updates.role === 'contractor_monitor_security' ? 'security'
+      : null,
     updated_at: new Date().toISOString(),
   };
   Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);

@@ -40,7 +40,15 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
     setForm({ name: '', username: '', role: 'data_entry', companyId: firstCompany?.id || '', section: 'رجال', phone: '' });
     setShowForm(true);
   };
-  const openEdit = (u) => { setEditing(u); setForm({ ...u, companyId: u.companyId || '' }); setShowForm(true); };
+  const openEdit = (u) => {
+    setEditing(u);
+    setForm({
+      ...u,
+      companyId: u.company_id || u.companyId || '',
+      contractorCompanyId: u.contractor_company_id || u.contractorCompanyId || '',
+    });
+    setShowForm(true);
+  };
   const validateUsername = (username) => /^[a-zA-Z0-9_]+$/.test(username);
 
   const save = async () => {
@@ -50,10 +58,20 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
     if (dup) { toast.show('اسم المستخدم مستخدم مسبقاً', 'warning'); return; }
 
     let finalForm = { ...form };
-    if (form.role === 'admin' || form.role === 'dashboard') { finalForm.companyId = null; finalForm.section = null; }
-    else if (form.role === 'supervisor') finalForm.companyId = null;
-    // أدوار المتعهدين: لا تحتاج شركة ولا قسم
-    else if (form.role?.startsWith('contractor_')) { finalForm.companyId = null; finalForm.section = null; }
+    if (form.role === 'admin' || form.role === 'dashboard') { finalForm.companyId = null; finalForm.section = null; finalForm.contractorCompanyId = null; }
+    else if (form.role === 'supervisor') { finalForm.companyId = null; finalForm.contractorCompanyId = null; }
+    else if (form.role === 'data_entry') { finalForm.contractorCompanyId = null; }
+    // مدير المشروع (PMO) - يرى الكل
+    else if (form.role === 'contractor_pmo') { finalForm.companyId = null; finalForm.section = null; finalForm.contractorCompanyId = null; }
+    // مراقبو المتعهدين - يحتاجون contractor_company_id
+    else if (form.role?.startsWith('contractor_monitor_')) {
+      finalForm.companyId = null;
+      finalForm.section = null;
+      if (!form.contractorCompanyId) {
+        toast.show('يجب تحديد الشركة المُراقَبة لأدوار المراقبين', 'warning');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
@@ -81,6 +99,9 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
   if (showForm) {
     const needsCompanyAndSection = form.role === 'data_entry';
     const needsSectionOnly = form.role === 'supervisor';
+    const needsContractorCompany = form.role === 'contractor_monitor_food'
+      || form.role === 'contractor_monitor_transport'
+      || form.role === 'contractor_monitor_security';
     return (
       <Card padding={20}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
@@ -135,6 +156,19 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
                 style={{ width: '100%', padding: '12px 14px', fontSize: 15, borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`, direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff', fontFamily: 'inherit' }}>
                 <option value="رجال">قسم الرجال</option><option value="نساء">قسم النساء</option>
               </select>
+            </div>
+          )}
+          {needsContractorCompany && (
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: THEME.colors.textSecondary, marginBottom: 6 }}>الشركة المُراقَبة</label>
+              <select value={form.contractorCompanyId || ''} onChange={e => setForm(p => ({ ...p, contractorCompanyId: e.target.value }))}
+                style={{ width: '100%', padding: '12px 14px', fontSize: 15, borderRadius: THEME.radius.md, border: `1.5px solid ${THEME.colors.border}`, direction: 'rtl', outline: 'none', minHeight: 48, background: '#fff', fontFamily: 'inherit' }}>
+                <option value="">— اختر الشركة —</option>
+                {companies.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <div style={{ fontSize: 11, color: THEME.colors.textTertiary, marginTop: 4 }}>
+                المراقب يتابع تنفيذ هذه الشركة في مجاله فقط
+              </div>
             </div>
           )}
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
