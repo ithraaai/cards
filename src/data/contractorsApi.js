@@ -220,3 +220,110 @@ export async function submitSession(sessionId) {
   if (error) throw error;
   return data;
 }
+
+// =================================================================
+// المخالفات والشواهد
+// =================================================================
+
+// تسجيل مخالفة (تلقائياً عند ضغط "مخالف")
+export async function recordViolation({
+  companyId, domainId, sessionId, criterionId,
+  dateId, levelId, description, evidenceUrl, reportedBy, isCritical
+}) {
+  const { data, error } = await supabase
+    .from('contract_violations')
+    .insert({
+      company_id: companyId,
+      domain_id: domainId,
+      session_id: sessionId,
+      criterion_id: criterionId,
+      violation_date: new Date().toISOString().split('T')[0],
+      date_id: dateId,
+      level_id: levelId || (isCritical ? 'critical' : 'medium'),
+      description: description || 'مخالفة مسجّلة تلقائياً',
+      evidence_url: evidenceUrl || null,
+      reported_by: reportedBy,
+      escalated: isCritical || false,
+      status: 'open',
+    })
+    .select().single();
+  if (error) throw error;
+  return data;
+}
+
+// حذف مخالفة مرتبطة بتقييم (عند تغيير المخالف لمطابق)
+export async function deleteViolationByCriterion(sessionId, criterionId) {
+  const { error } = await supabase
+    .from('contract_violations')
+    .delete()
+    .eq('session_id', sessionId)
+    .eq('criterion_id', criterionId);
+  if (error) console.error('فشل حذف المخالفة:', error);
+}
+
+// تحديث المخالفة (الوصف، الشاهد، الإبلاغ)
+export async function updateViolation(id, updates) {
+  const payload = {};
+  if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.evidenceUrl !== undefined) payload.evidence_url = updates.evidenceUrl;
+  if (updates.notifiedParty !== undefined) {
+    payload.notified_party = updates.notifiedParty;
+    if (updates.notifiedParty) payload.notified_at = new Date().toISOString();
+  }
+  if (updates.actionTaken !== undefined) payload.action_taken = updates.actionTaken;
+  if (updates.status !== undefined) payload.status = updates.status;
+  if (updates.levelId !== undefined) payload.level_id = updates.levelId;
+  payload.updated_at = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('contract_violations').update(payload).eq('id', id).select().single();
+  if (error) throw error;
+  return data;
+}
+
+// جلب المخالفات لجلسة معينة
+export async function getSessionViolations(sessionId) {
+  const { data, error } = await supabase
+    .from('contract_violations')
+    .select('*')
+    .eq('session_id', sessionId);
+  if (error) throw error;
+  return data;
+}
+
+// جلب المخالفات لشركة ومجال
+export async function getViolations({ companyId, domainId, dateFrom, dateTo, status, limit = 100 }) {
+  let query = supabase
+    .from('contract_violations')
+    .select(`
+      *,
+      level:violation_levels(name_ar, color),
+      criterion:contract_criteria(name_ar, is_critical)
+    `)
+    .order('violation_date', { ascending: false })
+    .limit(limit);
+  if (companyId) query = query.eq('company_id', companyId);
+  if (domainId) query = query.eq('domain_id', domainId);
+  if (status) query = query.eq('status', status);
+  if (dateFrom) query = query.gte('violation_date', dateFrom);
+  if (dateTo) query = query.lte('violation_date', dateTo);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+}
+
+// إحصاءات المخالفات
+export async function getViolationStats(companyId, domainId) {
+  const { data, error } = await supabase
+    .from('contract_violations')
+    .select('level_id, escalated, status')
+    .eq('company_id', companyId)
+    .eq('domain_id', domainId);
+  if (error) throw error;
+  return {
+    total: data.length,
+    critical: data.filter(v => v.level_id === 'critical').length,
+    high: data.filter(v => v.level_id === 'high').length,
+    open: data.filter(v => v.status === 'open').length,
+    notified: data.filter(v => v.notified_party).length,
+  };
+}

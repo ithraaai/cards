@@ -381,6 +381,27 @@ function SessionFillPage({ user, companyId, domainId, company, domainInfo, check
         filledBy: user.id,
       });
       setEvaluations(prev => ({ ...prev, [criterionId]: saved }));
+
+      // تسجيل/حذف المخالفة تلقائياً
+      const criterion = criteria.find(c => c.id === criterionId);
+      if (status === 'violation' && criterion) {
+        try {
+          await cApi.recordViolation({
+            companyId, domainId,
+            sessionId: session.id, criterionId,
+            dateId, levelId: criterion.is_critical ? 'critical' : 'medium',
+            description: note || `مخالفة: ${criterion.name_ar}`,
+            reportedBy: user.id,
+            isCritical: criterion.is_critical,
+          });
+          if (criterion.is_critical) {
+            toast.show('⚠️ بند حرج - يستوجب التصعيد الفوري', 'warning');
+          }
+        } catch (err) { console.error('فشل تسجيل المخالفة:', err); }
+      } else if (status !== 'violation') {
+        // حذف المخالفة لو كانت موجودة (تغيّر التقييم من مخالف لمطابق)
+        await cApi.deleteViolationByCriterion(session.id, criterionId);
+      }
     } catch (err) {
       console.error(err);
       toast.show('فشل الحفظ', 'error');
