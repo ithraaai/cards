@@ -28,6 +28,7 @@ import {
 } from '../data/seed.js';
 import { THEME } from '../data/theme.js';
 import { calculateStats } from '../data/stats.js';
+import { APP_VERSION, APP_BUILD_DATE } from '../data/version.js';
 import * as api from '../data/api.js';
 
 // =================================================================
@@ -134,6 +135,14 @@ function LoginPage({ onLogin, toast }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Input label="اسم المستخدم" icon={User} value={username} onChange={e => setUsername(e.target.value)} placeholder="أدخل اسم المستخدم" onKeyDown={e => e.key === 'Enter' && handleSubmit()} autoFocus disabled={loading}/>
           <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={loading}>{loading ? 'جاري التحقق...' : 'تسجيل الدخول'}</Button>
+        </div>
+        {/* رقم الإصدار */}
+        <div style={{
+          marginTop: 24, paddingTop: 14,
+          borderTop: `1px dashed ${THEME.colors.border}`,
+          textAlign: 'center', fontSize: 11, color: THEME.colors.textTertiary,
+        }}>
+          • الإصدار {APP_VERSION} • بُني في {APP_BUILD_DATE}
         </div>
       </div>
     </div>

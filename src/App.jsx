@@ -21,7 +21,6 @@ import {
 
 import { ContractorsModule } from './components/ContractorsModule.jsx';
 import { MonitorPage } from './components/MonitorPage.jsx';
-import { APP_VERSION, APP_BUILD_DATE, APP_VERSION_NOTES } from './data/version.js';
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -424,24 +423,6 @@ export default function App() {
             {page === 'monitor' && (
               <MonitorPage user={user} companies={companies} toast={toast} />
             )}
-
-            {/* Footer مع رقم الإصدار */}
-            <footer style={{
-              marginTop: 40, padding: '16px 8px',
-              borderTop: `1px dashed ${THEME.colors.border}`,
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: 11, color: THEME.colors.textTertiary, lineHeight: 1.6 }}>
-                <span style={{ fontWeight: 600 }}>منصة إدارة عمليات إثراء التجربة</span>
-                {' • '}
-                <span>الإصدار {APP_VERSION}</span>
-                {' • '}
-                <span>بُني في {APP_BUILD_DATE}</span>
-              </div>
-              <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 4, opacity: 0.7 }}>
-                {APP_VERSION_NOTES}
-              </div>
-            </footer>
           </main>
         </div>
       </div>

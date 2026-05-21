@@ -97,7 +97,6 @@ function MonitorHome({ user, company, domainId, domainInfo, onOpenSession, toast
   useEffect(() => {
     (async () => {
       try {
-        // جلب الإعدادات + القوائم + الجلسات السابقة
         const [cl, recents, settingsData] = await Promise.all([
           cApi.getChecklists(domainId),
           cApi.getMonitorSessions(user.id, 10),
@@ -106,7 +105,6 @@ function MonitorHome({ user, company, domainId, domainInfo, onOpenSession, toast
         setChecklists(cl);
         setRecentSessions(recents);
         setSettings(settingsData);
-        // اليوم الحالي افتراضياً (1-13 بناءً على تاريخ بداية الموسم)
         const today = getDefaultDateId(settingsData?.season_start_date);
         setSelectedDateId(today);
       } catch (err) {
@@ -126,18 +124,19 @@ function MonitorHome({ user, company, domainId, domainInfo, onOpenSession, toast
 
   // تصنيف القوائم
   const dailyChecklists = checklists.filter(c => c.phase_id === 'daily');
-  // دمج "الأولية" + "الختامية" في "تقييم الجاهزية"
   const readinessChecklists = checklists.filter(c => c.phase_id === 'pre' || c.phase_id === 'closing');
 
-  // فلترة القوائم اليومية حسب اليوم (مثلاً يوم عرفة = 9 فقط)
+  // فلترة القوائم اليومية حسب اليوم (مزدلفة/عرفة/العيد تظهر فقط في يومها)
   const visibleDailyChecklists = dailyChecklists.filter(cl => {
-    const code = cl.code?.toLowerCase() || '';
+    const code = (cl.code || '').toLowerCase();
     const name = cl.name_ar || '';
-    // قوائم خاصة بيوم عرفة
-    if (code.includes('arafah') || name.includes('عرفة')) return selectedDateId === '9';
-    // قوائم خاصة بيوم العيد (10 ذو الحجة)
-    if (code.includes('eid') || name.includes('العيد') || name.includes('عيد')) return selectedDateId === '10';
-    // قوائم خاصة بأيام النحر/التشريق (10-13)
+    // مزدلفة في يوم 9 فقط
+    if (code.includes('muzdalifa') || name.includes('مزدلفة')) return selectedDateId === '9';
+    // عرفة في يوم 9 فقط
+    if (code.includes('arafa') || code.includes('arafah') || name.includes('عرفة')) return selectedDateId === '9';
+    // العيد في يوم 10 فقط
+    if (code.includes('eid') || (name.includes('عيد') && !name.includes('سعيد'))) return selectedDateId === '10';
+    // أيام النحر/التشريق (10-13)
     if (code.includes('nahr') || code.includes('tashreeq') || name.includes('النحر') || name.includes('التشريق')) {
       return ['10', '11', '12', '13'].includes(selectedDateId);
     }
@@ -145,13 +144,15 @@ function MonitorHome({ user, company, domainId, domainInfo, onOpenSession, toast
     if (code.includes('peak') || name.includes('الذروة') || name.includes('ذروة')) {
       return ['8', '9', '10', '11', '12', '13'].includes(selectedDateId);
     }
-    // باقي القوائم اليومية تظهر دائماً
     return true;
   });
 
+  // إذا كان هناك قائمة يومية واحدة فقط، نفتحها مباشرة (للنقل والحراسات)
+  const hasSingleDailyList = visibleDailyChecklists.length === 1;
+
   return (
     <div>
-      {/* رأس مدمج مع معلومات المراقب */}
+      {/* رأس مدمج */}
       <Card padding={14} style={{
         marginBottom: 14,
         background: `linear-gradient(135deg, ${domainInfo.color} 0%, ${darken(domainInfo.color)} 100%)`,
@@ -176,11 +177,10 @@ function MonitorHome({ user, company, domainId, domainInfo, onOpenSession, toast
         </div>
       </Card>
 
-      {/* المحتوى الرئيسي - تصميم عمودين على الديسكتوب */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 14, alignItems: 'flex-start' }}>
-        {/* العمود الأيسر/الرئيسي: القوائم اليومية */}
+        {/* العمود الرئيسي (يمين) */}
         <div>
-          {/* اختيار اليوم (تظهر فوق القوائم اليومية مباشرة) */}
+          {/* اختيار اليوم */}
           <Card padding={12} style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <Calendar size={14} color={domainInfo.color} />
@@ -207,8 +207,7 @@ function MonitorHome({ user, company, domainId, domainInfo, onOpenSession, toast
                     {isToday && !active && (
                       <div style={{
                         position: 'absolute', top: -3, right: -3,
-                        width: 8, height: 8, borderRadius: '50%',
-                        background: domainInfo.color,
+                        width: 8, height: 8, borderRadius: '50%', background: domainInfo.color,
                       }} />
                     )}
                   </button>
@@ -217,11 +216,43 @@ function MonitorHome({ user, company, domainId, domainInfo, onOpenSession, toast
             </div>
           </Card>
 
-          {/* القوائم اليومية - بارزة في الأعلى */}
-          {visibleDailyChecklists.length > 0 ? (
+          {/* القوائم اليومية - بدون نقرة إضافية إذا كانت واحدة */}
+          {visibleDailyChecklists.length === 0 ? (
+            <Card padding={20} style={{ marginBottom: 12, textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: THEME.colors.textTertiary }}>
+                لا توجد قوائم تشغيلية متاحة لليوم {selectedDateId}
+              </div>
+            </Card>
+          ) : hasSingleDailyList ? (
+            // قائمة واحدة فقط - زر دخول مباشر بارز
+            <Card padding={16} style={{
+              marginBottom: 12,
+              background: `linear-gradient(135deg, ${domainInfo.color}15 0%, ${domainInfo.color}05 100%)`,
+              border: `2px solid ${domainInfo.color}`,
+            }}>
+              <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: THEME.colors.textTertiary, marginBottom: 4 }}>قائمة المراقبة لليوم {selectedDateId}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: domainInfo.color, marginBottom: 4 }}>
+                  {visibleDailyChecklists[0].name_ar}
+                </div>
+                {visibleDailyChecklists[0].description && (
+                  <div style={{ fontSize: 11, color: THEME.colors.textTertiary }}>
+                    {visibleDailyChecklists[0].description}
+                  </div>
+                )}
+              </div>
+              <Button variant="primary" icon={Edit3} fullWidth
+                onClick={() => onOpenSession(visibleDailyChecklists[0], selectedDateId)}
+                style={{ background: domainInfo.color, borderColor: domainInfo.color }}>
+                بدء تعبئة المراقبة
+              </Button>
+            </Card>
+          ) : (
+            // قوائم متعددة - اختيار (للإعاشة)
             <Card padding={14} style={{ marginBottom: 12, border: `2px solid ${domainInfo.color}33` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: `1px dashed ${THEME.colors.border}` }}>
                 <span style={{ fontSize: 14, fontWeight: 700, color: domainInfo.color }}>📋 قوائم اليوم {selectedDateId}</span>
+                <Badge color="info" style={{ fontSize: 10 }}>{visibleDailyChecklists.length} قائمة</Badge>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {visibleDailyChecklists.map(cl => (
@@ -230,77 +261,79 @@ function MonitorHome({ user, company, domainId, domainInfo, onOpenSession, toast
                 ))}
               </div>
             </Card>
-          ) : (
-            <Card padding={20} style={{ marginBottom: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: THEME.colors.textTertiary }}>
-                لا توجد قوائم تشغيلية متاحة لليوم {selectedDateId}
-              </div>
-            </Card>
-          )}
-
-          {/* سجل الجلسات السابقة */}
-          {recentSessions.length > 0 && (
-            <Card padding={14}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: `1px dashed ${THEME.colors.border}` }}>
-                <Clock size={14} color={THEME.colors.textSecondary} />
-                <span style={{ fontSize: 13, fontWeight: 700 }}>الجلسات الأخيرة</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {recentSessions.slice(0, 5).map(s => (
-                  <div key={s.id} style={{
-                    padding: 10, background: THEME.colors.bgSecondary, borderRadius: 8,
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    fontSize: 11, color: THEME.colors.textSecondary,
-                  }}>
-                    <div>
-                      <div style={{ fontWeight: 600, color: THEME.colors.text }}>{s.checklist?.name_ar || 'قائمة'}</div>
-                      <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 2 }}>
-                        {s.date_id ? `اليوم ${s.date_id}` : 'بدون يوم'} • {new Date(s.created_at).toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' })}
-                      </div>
-                    </div>
-                    <Badge color={s.status === 'submitted' ? 'success' : s.status === 'approved' ? 'info' : 'warning'} style={{ fontSize: 10 }}>
-                      {s.status === 'submitted' ? 'مُرسلة' : s.status === 'approved' ? 'مُعتمدة' : 'قيد الإكمال'}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </Card>
           )}
         </div>
 
-        {/* العمود الأيمن (الجانبي): تقييم الجاهزية */}
-        {readinessChecklists.length > 0 && (
-          <div style={{ minWidth: 240, maxWidth: 280 }}>
-            <Card padding={14} style={{ background: THEME.colors.bgSecondary, border: `1px solid ${THEME.colors.border}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, paddingBottom: 8, borderBottom: `1px dashed ${THEME.colors.border}` }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>📌 تقييم الجاهزية</span>
+        {/* العمود الجانبي (يسار): الجاهزية + الجلسات الأخيرة */}
+        <div style={{ minWidth: 240, maxWidth: 280 }}>
+          {/* تقييم الجاهزية */}
+          {readinessChecklists.length > 0 && (
+            <Card padding={14} style={{
+              background: THEME.colors.bgSecondary,
+              border: `1px solid ${THEME.colors.border}`,
+              marginBottom: 10,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, paddingBottom: 6, borderBottom: `1px dashed ${THEME.colors.border}` }}>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>📌 تقييم الجاهزية</span>
               </div>
               <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginBottom: 8, lineHeight: 1.5 }}>
                 قوائم تُعبَّأ قبل الموسم أو في نهايته
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {readinessChecklists.map(cl => (
                   <button key={cl.id}
                     onClick={() => onOpenSession(cl, cl.phase_id === 'pre' ? null : selectedDateId)}
                     style={{
-                      padding: '10px 12px', background: '#fff',
+                      padding: '8px 10px', background: '#fff',
                       border: `1px solid ${domainInfo.color}33`,
                       borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
-                      textAlign: 'right', display: 'flex', alignItems: 'center', gap: 8,
+                      textAlign: 'right', display: 'flex', alignItems: 'center', gap: 6,
                       transition: 'all 0.15s',
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = `${domainInfo.color}08`; e.currentTarget.style.borderColor = domainInfo.color; }}
                     onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = `${domainInfo.color}33`; }}>
-                    <ChevronLeft size={14} color={domainInfo.color} style={{ flexShrink: 0 }} />
-                    <div style={{ flex: 1, fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>
+                    <ChevronLeft size={12} color={domainInfo.color} style={{ flexShrink: 0 }} />
+                    <div style={{ flex: 1, fontSize: 10, fontWeight: 600, lineHeight: 1.4 }}>
                       {cl.name_ar}
                     </div>
                   </button>
                 ))}
               </div>
             </Card>
-          </div>
-        )}
+          )}
+
+          {/* الجلسات الأخيرة */}
+          {recentSessions.length > 0 && (
+            <Card padding={14} style={{
+              background: THEME.colors.bgSecondary,
+              border: `1px solid ${THEME.colors.border}`,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, paddingBottom: 6, borderBottom: `1px dashed ${THEME.colors.border}` }}>
+                <Clock size={12} color={THEME.colors.textSecondary} />
+                <span style={{ fontSize: 12, fontWeight: 700 }}>الجلسات الأخيرة</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {recentSessions.slice(0, 5).map(s => (
+                  <div key={s.id} style={{
+                    padding: 8, background: '#fff', borderRadius: 6,
+                    fontSize: 10, color: THEME.colors.textSecondary,
+                    border: `1px solid ${THEME.colors.border}`,
+                  }}>
+                    <div style={{ fontWeight: 600, color: THEME.colors.text, marginBottom: 2 }}>
+                      {s.checklist?.name_ar || 'قائمة'}
+                    </div>
+                    <div style={{ fontSize: 9, color: THEME.colors.textTertiary, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{s.date_id ? `اليوم ${s.date_id}` : 'بدون يوم'}</span>
+                      <Badge color={s.status === 'submitted' ? 'success' : s.status === 'approved' ? 'info' : 'warning'} style={{ fontSize: 8 }}>
+                        {s.status === 'submitted' ? 'مُرسلة' : s.status === 'approved' ? 'مُعتمدة' : 'قيد الإكمال'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -400,6 +433,48 @@ function SessionFillPage({ user, companyId, domainId, company, domainInfo, check
         } catch (err) { console.error('فشل تسجيل المخالفة:', err); }
       } else if (status !== 'violation') {
         // حذف المخالفة لو كانت موجودة (تغيّر التقييم من مخالف لمطابق)
+        await cApi.deleteViolationByCriterion(session.id, criterionId);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.show('فشل الحفظ', 'error');
+    } finally {
+      setSaving(prev => {
+        const next = new Set(prev);
+        next.delete(criterionId);
+        return next;
+      });
+    }
+  };
+
+  // حفظ قيمة رقمية مع تحديد تلقائي للمطابقة
+  const handleSaveNumeric = async (criterionId, num, autoStatus, note = null) => {
+    if (!session) return;
+    setSaving(prev => new Set([...prev, criterionId]));
+    try {
+      const saved = await cApi.saveEvaluation({
+        sessionId: session.id,
+        criterionId,
+        status: autoStatus,
+        valueNumber: num,
+        note,
+        filledBy: user.id,
+      });
+      setEvaluations(prev => ({ ...prev, [criterionId]: saved }));
+      // تسجيل/حذف المخالفة تلقائياً
+      const criterion = criteria.find(c => c.id === criterionId);
+      if (autoStatus === 'violation' && criterion) {
+        try {
+          await cApi.recordViolation({
+            companyId, domainId,
+            sessionId: session.id, criterionId,
+            dateId, levelId: criterion.is_critical ? 'critical' : 'medium',
+            description: note || `قيمة غير مطابقة: ${num} ${criterion.qty_unit || ''}`,
+            reportedBy: user.id,
+            isCritical: criterion.is_critical,
+          });
+        } catch (err) { console.error(err); }
+      } else if (autoStatus !== 'violation') {
         await cApi.deleteViolationByCriterion(session.id, criterionId);
       }
     } catch (err) {
@@ -527,6 +602,7 @@ function SessionFillPage({ user, companyId, domainId, company, domainInfo, check
             disabled={isSubmitted}
             domainColor={domainInfo.color}
             onSave={(status) => handleSave(cr.id, status, evaluations[cr.id]?.note)}
+            onSaveNumeric={(num, autoStatus) => handleSaveNumeric(cr.id, num, autoStatus, evaluations[cr.id]?.note)}
             onNoteChange={(note) => handleNoteChange(cr.id, note)}
             onNoteBlur={() => handleNoteBlur(cr.id)}
           />
@@ -618,7 +694,7 @@ function exportSessionCSV(criteria, evaluations, checklist, company, dateId) {
 // =================================================================
 // سطر معيار واحد
 // =================================================================
-function CriterionRow({ index, criterion, evaluation, saving, disabled, domainColor, onSave, onNoteChange, onNoteBlur }) {
+function CriterionRow({ index, criterion, evaluation, saving, disabled, domainColor, onSave, onSaveNumeric, onNoteChange, onNoteBlur }) {
   const status = evaluation?.status;
   const note = evaluation?.note || '';
   const needsNoteForViolation = criterion.note_required === 'on_violation' && status === 'violation' && !note.trim();
@@ -723,6 +799,58 @@ function CriterionRow({ index, criterion, evaluation, saving, disabled, domainCo
               fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
               transition: 'all 0.15s',
               opacity: disabled ? 0.6 : 1,
+            }}>
+            غير منطبق
+          </button>
+        </div>
+      )}
+
+      {/* للمعايير الرقمية: input رقمي + تحديد تلقائي مطابق/مخالف */}
+      {!isCompliance && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="number"
+            step="any"
+            disabled={disabled}
+            placeholder={`أدخل القيمة${criterion.qty_unit ? ' (' + criterion.qty_unit + ')' : ''}`}
+            value={evaluation?.value_number ?? ''}
+            onChange={e => {
+              const num = e.target.value === '' ? null : parseFloat(e.target.value);
+              // تحديد تلقائي للمطابقة بناءً على min/max
+              let autoStatus = status;
+              if (num !== null && !isNaN(num)) {
+                if (criterion.min_value != null && num < criterion.min_value) autoStatus = 'violation';
+                else if (criterion.max_value != null && num > criterion.max_value) autoStatus = 'violation';
+                else if (criterion.required_qty != null && num < criterion.required_qty) autoStatus = 'violation';
+                else autoStatus = 'compliant';
+              }
+              onSaveNumeric(num, autoStatus);
+            }}
+            style={{
+              flex: 1, minWidth: 120, padding: '10px 12px', borderRadius: 8,
+              border: `1.5px solid ${status === 'violation' ? THEME.colors.danger : status === 'compliant' ? THEME.colors.success : THEME.colors.border}`,
+              fontSize: 14, fontFamily: 'inherit', textAlign: 'center', fontWeight: 600,
+              outline: 'none', opacity: disabled ? 0.6 : 1,
+            }}/>
+          {(criterion.required_qty != null || criterion.min_value != null || criterion.max_value != null) && (
+            <span style={{ fontSize: 11, color: THEME.colors.textTertiary }}>
+              {criterion.min_value != null && criterion.max_value != null
+                ? `النطاق: ${criterion.min_value}-${criterion.max_value}`
+                : criterion.required_qty != null
+                ? `المطلوب: ${criterion.required_qty}${criterion.qty_unit ? ' ' + criterion.qty_unit : ''}`
+                : ''}
+            </span>
+          )}
+          <button
+            disabled={disabled}
+            onClick={() => onSave('na')}
+            style={{
+              padding: '8px 12px', borderRadius: 8,
+              background: status === 'na' ? THEME.colors.textTertiary : '#fff',
+              color: status === 'na' ? '#fff' : THEME.colors.textTertiary,
+              border: `1.5px solid ${THEME.colors.textTertiary}`,
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
             }}>
             غير منطبق
           </button>

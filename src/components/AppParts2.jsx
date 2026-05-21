@@ -237,6 +237,13 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
         {users.map(u => {
           const role = ROLES_CONFIG[u.role];
           const company = companies.find(c => c.id === u.companyId);
+          // معلومات إضافية لأدوار المتعهدين
+          const contractorCompanyId = u.contractor_company_id || u.contractorCompanyId;
+          const contractorCompany = contractorCompanyId ? companies.find(c => c.id === contractorCompanyId) : null;
+          const pmoDomains = u.pmo_domains || u.pmoDomains || [];
+          const domainLabels = { food: 'الإعاشة', transport: 'النقل', security: 'الحراسات' };
+          const isMonitor = u.role?.startsWith('contractor_monitor_');
+          const isPmo = u.role === 'contractor_pmo';
           return (
             <Card key={u.id} padding={14}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
@@ -245,6 +252,24 @@ export function UsersPage({ users, companies, toast, refreshUsers }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
                     <span style={{ fontSize: 15, fontWeight: 700 }}>{u.name}</span>
                     {!u.active && <Badge color="gray">معطّل</Badge>}
+                    {isMonitor && contractorCompany && (
+                      <Badge color="info" style={{ fontSize: 10 }}>🏢 {contractorCompany.name}</Badge>
+                    )}
+                    {isMonitor && !contractorCompany && (
+                      <Badge color="warning" style={{ fontSize: 10 }}>⚠ بدون شركة</Badge>
+                    )}
+                    {isPmo && pmoDomains.length > 0 && (
+                      <>
+                        {pmoDomains.map(d => (
+                          <Badge key={d} color="purple" style={{ fontSize: 10 }}>
+                            {domainLabels[d] || d}
+                          </Badge>
+                        ))}
+                      </>
+                    )}
+                    {isPmo && pmoDomains.length === 0 && (
+                      <Badge color="warning" style={{ fontSize: 10 }}>⚠ بدون مجالات</Badge>
+                    )}
                   </div>
                   <div style={{ fontSize: 12, color: THEME.colors.textSecondary, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                     <span><User size={11} style={{ display: 'inline', marginLeft: 4 }} />{u.username}</span>
@@ -690,9 +715,48 @@ export function SettingsPage({ settings, teams, refreshSettings, toast }) {
 
   const manuallyClosedDates = settings.manually_closed_dates || [];
 
+  // تبويبات الإعدادات
+  const [activeTab, setActiveTab] = useState('season');
+  const tabs = [
+    { id: 'season', label: 'الموسم والتواريخ', icon: Calendar, color: '#185FA5' },
+    { id: 'closing', label: 'الإغلاق والجلسات', icon: Lock, color: '#BA7517' },
+    { id: 'reports', label: 'إعدادات التقارير', icon: FileText, color: '#27500A' },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h2 style={{ fontSize: 20, fontWeight: 700 }}>إعدادات النظام</h2>
+
+      {/* شريط التبويبات */}
+      <Card padding={6}>
+        <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
+          {tabs.map(t => {
+            const TabIcon = t.icon;
+            const active = activeTab === t.id;
+            return (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                style={{
+                  flex: 1, minWidth: 140,
+                  padding: '12px 14px', border: 'none', borderRadius: 8,
+                  background: active ? t.color : 'transparent',
+                  color: active ? '#fff' : THEME.colors.text,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 13, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = THEME.colors.bgSecondary; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
+                <TabIcon size={16} />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* محتوى التبويبات */}
+      <div style={{ display: activeTab === 'season' ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}>
 
       <Card padding={20}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -712,6 +776,10 @@ export function SettingsPage({ settings, teams, refreshSettings, toast }) {
         )}
         <Button variant="primary" icon={Save} onClick={saveSeasonDate} fullWidth style={{ marginTop: 14 }} disabled={saving}>{saving ? '...' : 'حفظ التاريخ'}</Button>
       </Card>
+      </div>
+
+      {/* تبويب: الإغلاق والجلسات */}
+      <div style={{ display: activeTab === 'closing' ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}>
 
       <Card padding={20}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -921,6 +989,10 @@ export function SettingsPage({ settings, teams, refreshSettings, toast }) {
           })}
         </div>
       </Card>
+      </div>
+
+      {/* تبويب: التقارير */}
+      <div style={{ display: activeTab === 'reports' ? 'flex' : 'none', flexDirection: 'column', gap: 16 }}>
 
       {/* إدارة عناصر تقرير مدخل البيانات */}
       <ReportSectionsManager
@@ -955,6 +1027,7 @@ export function SettingsPage({ settings, teams, refreshSettings, toast }) {
         icon={FileBarChart}
         iconColor={THEME.colors.purple}
       />
+      </div>
     </div>
   );
 }
@@ -1349,6 +1422,159 @@ function ReportPreviewModal({ title, sections, onClose }) {
           </div>
         );
       default:
+        // محتوى افتراضي لأي قسم غير معرّف صراحة
+        // (هذا يشمل أقسام تقرير المدخل: teams_progress, sessions_comparison, إلخ)
+        if (sectionId === 'teams_progress') {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8 }}>
+              {[
+                { name: 'فريق الاستقبال', done: 24, total: 27, pct: 89 },
+                { name: 'فريق الإعاشة', done: 27, total: 27, pct: 100 },
+                { name: 'فريق التسكين', done: 22, total: 27, pct: 81 },
+                { name: 'فريق النقل', done: 20, total: 27, pct: 74 },
+              ].map((t, i) => (
+                <div key={i} style={{ padding: 8, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 600 }}>{t.name}</span>
+                    <span style={{ fontWeight: 700, color: t.pct >= 90 ? THEME.colors.success : t.pct >= 75 ? THEME.colors.warning : THEME.colors.danger }}>
+                      {t.done}/{t.total} ({t.pct}%)
+                    </span>
+                  </div>
+                  <div style={{ height: 6, background: THEME.colors.bgSecondary, borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${t.pct}%`, background: t.pct >= 90 ? THEME.colors.success : t.pct >= 75 ? THEME.colors.warning : THEME.colors.danger }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        }
+        if (sectionId === 'sessions_comparison') {
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: 8 }}>
+              <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}`, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: THEME.colors.info, marginBottom: 4 }}>🌅 الجلسة الصباحية</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: THEME.colors.success }}>92%</div>
+                <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 4 }}>27 معيار · 25 مطابق · 2 ملاحظة</div>
+              </div>
+              <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}`, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: THEME.colors.accent, marginBottom: 4 }}>🌆 الجلسة المسائية</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: THEME.colors.success }}>88%</div>
+                <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 4 }}>27 معيار · 24 مطابق · 3 ملاحظات</div>
+              </div>
+            </div>
+          );
+        }
+        if (sectionId === 'charts') {
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: 8 }}>
+              {/* نعم/لا */}
+              <div style={{ padding: 10, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+                <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6, textAlign: 'center' }}>إجابات نعم/لا</div>
+                <div style={{ display: 'flex', gap: 4, height: 60, alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1, background: THEME.colors.success, height: '85%', borderRadius: '4px 4px 0 0', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 700, padding: 2 }}>85%</div>
+                  <div style={{ flex: 1, background: THEME.colors.danger, height: '15%', borderRadius: '4px 4px 0 0', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 700, padding: 2 }}>15%</div>
+                </div>
+                <div style={{ display: 'flex', gap: 4, fontSize: 9, color: THEME.colors.textTertiary, marginTop: 4 }}>
+                  <span style={{ flex: 1, textAlign: 'center' }}>نعم</span>
+                  <span style={{ flex: 1, textAlign: 'center' }}>لا</span>
+                </div>
+              </div>
+              {/* التقييمات */}
+              <div style={{ padding: 10, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+                <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6, textAlign: 'center' }}>توزيع التقييمات</div>
+                <div style={{ display: 'flex', gap: 2, height: 60, alignItems: 'flex-end' }}>
+                  {[{ v: 45, c: '#27500A' }, { v: 30, c: '#97C459' }, { v: 15, c: '#F6C76F' }, { v: 7, c: '#E89B4C' }, { v: 3, c: '#E24B4A' }].map((b, i) => (
+                    <div key={i} style={{ flex: 1, background: b.c, height: `${b.v * 2}%`, borderRadius: '3px 3px 0 0', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', color: '#fff', fontSize: 9, padding: 1 }}>{b.v}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (sectionId === 'teams_chart') {
+          return (
+            <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+              {[
+                { name: 'الاستقبال', value: 88, color: THEME.colors.info },
+                { name: 'الإعاشة', value: 92, color: THEME.colors.success },
+                { name: 'التسكين', value: 85, color: THEME.colors.warning },
+                { name: 'النقل', value: 79, color: THEME.colors.accent },
+                { name: 'الثقافي', value: 95, color: THEME.colors.purple },
+              ].map((t, i) => (
+                <div key={i} style={{ marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                    <span>{t.name}</span>
+                    <span style={{ fontWeight: 700 }}>{t.value}%</span>
+                  </div>
+                  <div style={{ height: 8, background: THEME.colors.bgSecondary, borderRadius: 4 }}>
+                    <div style={{ height: '100%', width: `${t.value}%`, background: t.color, borderRadius: 4 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        }
+        if (sectionId === 'radar') {
+          return (
+            <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}`, textAlign: 'center' }}>
+              <svg viewBox="0 0 200 200" style={{ width: 160, height: 160 }}>
+                {/* خلفية الرادار */}
+                {[0.25, 0.5, 0.75, 1].map(r => (
+                  <polygon key={r}
+                    points={Array.from({ length: 6 }, (_, i) => {
+                      const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+                      const x = 100 + Math.cos(angle) * 70 * r;
+                      const y = 100 + Math.sin(angle) * 70 * r;
+                      return `${x},${y}`;
+                    }).join(' ')}
+                    fill="none" stroke="#ddd" strokeWidth="1" />
+                ))}
+                {/* البيانات */}
+                <polygon
+                  points={[88, 92, 85, 79, 95, 87].map((v, i) => {
+                    const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+                    const r = (v / 100) * 70;
+                    return `${100 + Math.cos(angle) * r},${100 + Math.sin(angle) * r}`;
+                  }).join(' ')}
+                  fill={THEME.colors.accent + '55'} stroke={THEME.colors.accent} strokeWidth="2" />
+              </svg>
+              <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 4 }}>
+                توزيع الأداء على 6 محاور رئيسية
+              </div>
+            </div>
+          );
+        }
+        if (sectionId === 'problems') {
+          return (
+            <div style={{ padding: 8 }}>
+              {[
+                'نظافة دورات المياه - 3 ملاحظات',
+                'التزام مواعيد الوجبات - متأخر 15 دقيقة',
+                'سرعة الاستجابة لطلبات الحجاج - تحتاج تحسين',
+              ].map((p, i) => (
+                <div key={i} style={{ padding: '6px 10px', borderRight: `3px solid ${THEME.colors.warning}`, background: THEME.colors.warningSoft + '40', borderRadius: 4, fontSize: 11, marginBottom: 4 }}>
+                  ⚠️ {p}
+                </div>
+              ))}
+            </div>
+          );
+        }
+        if (sectionId === 'positive_highlights') {
+          return (
+            <div style={{ padding: 8 }}>
+              {[
+                'فريق الثقافي حقق 95% - أداء استثنائي',
+                'فريق الإعاشة لم يتأخر في أي وجبة',
+                'فريق النظافة أكمل المهام قبل الموعد',
+              ].map((p, i) => (
+                <div key={i} style={{ padding: '6px 10px', borderRight: `3px solid ${THEME.colors.success}`, background: THEME.colors.successSoft + '60', borderRadius: 4, fontSize: 11, marginBottom: 4 }}>
+                  ⭐ {p}
+                </div>
+              ))}
+            </div>
+          );
+        }
+        // محتوى عام احتياطي
         return (
           <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px dashed ${THEME.colors.border}`, fontSize: 11, color: THEME.colors.textTertiary, textAlign: 'center' }}>
             محتوى هذا القسم يعرض البيانات الفعلية للتقرير
