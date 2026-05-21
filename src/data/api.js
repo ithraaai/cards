@@ -386,9 +386,22 @@ export async function seedTeamsIfEmpty(initialTeams) {
 
 export function dbUserToApp(dbUser) {
   return {
-    id: dbUser.id, name: dbUser.name, username: dbUser.username,
-    role: dbUser.role, companyId: dbUser.company_id, section: dbUser.section,
-    phone: dbUser.phone, active: dbUser.active,
+    id: dbUser.id,
+    name: dbUser.name,
+    username: dbUser.username,
+    role: dbUser.role,
+    companyId: dbUser.company_id,
+    section: dbUser.section,
+    phone: dbUser.phone,
+    active: dbUser.active,
+    // حقول وحدة المتعهدين
+    contractorCompanyId: dbUser.contractor_company_id,
+    contractorScopeDomain: dbUser.contractor_scope_domain,
+    pmoDomains: dbUser.pmo_domains || [],
+    // نحتفظ بأسماء snake_case للتوافق
+    contractor_company_id: dbUser.contractor_company_id,
+    contractor_scope_domain: dbUser.contractor_scope_domain,
+    pmo_domains: dbUser.pmo_domains,
   };
 }
 

@@ -1136,71 +1136,304 @@ function ReportSectionsManager({ title, description, defaultSections, savedSecti
 }
 
 // =================================================================
-// Modal معاينة التقرير
+// Modal معاينة التقرير - ببيانات افتراضية واقعية
 // =================================================================
 function ReportPreviewModal({ title, sections, onClose }) {
+  // محتوى وهمي واقعي لكل نوع قسم
+  const renderSectionContent = (sectionId) => {
+    switch (sectionId) {
+      case 'kpis':
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+            {[
+              { label: 'المعدل العام', value: '87%', color: THEME.colors.success },
+              { label: 'إجمالي التقييمات', value: '1,247', color: THEME.colors.info },
+              { label: 'نسبة الامتثال', value: '92%', color: THEME.colors.success },
+              { label: 'الملاحظات السلبية', value: '23', color: THEME.colors.warning },
+            ].map((k, i) => (
+              <div key={i} style={{ padding: 10, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}`, textAlign: 'center' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: k.color }}>{k.value}</div>
+                <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 2 }}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+        );
+      case 'insights':
+        return (
+          <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+            <div style={{ fontSize: 12, color: THEME.colors.text, lineHeight: 1.8 }}>
+              ✅ <strong>أداء ممتاز</strong>: شركة الإتقان تتقدم في تقييمات الإعاشة بنسبة 94%.
+              <br/>
+              ⚠️ <strong>للانتباه</strong>: 3 ملاحظات سلبية متكررة في فريق النقل ليوم 5.
+              <br/>
+              📈 <strong>تحسّن</strong>: ارتفاع 8% في الأداء العام مقارنة بالأسبوع الماضي.
+            </div>
+          </div>
+        );
+      case 'companyChart':
+      case 'company':
+        return (
+          <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+            {[
+              { name: 'الإتقان', value: 94, color: '#27500A' },
+              { name: 'أضواء الإيمان', value: 89, color: '#185FA5' },
+              { name: 'الفرائض', value: 85, color: '#BA7517' },
+              { name: 'الناصرية', value: 82, color: '#993556' },
+            ].map((c, i) => (
+              <div key={i} style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+                  <span>{c.name}</span>
+                  <span style={{ fontWeight: 700 }}>{c.value}%</span>
+                </div>
+                <div style={{ height: 8, background: THEME.colors.bgSecondary, borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${c.value}%`, background: c.color, borderRadius: 4 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      case 'teamsChart':
+      case 'teams':
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6 }}>
+            {['الاستقبال', 'الإعاشة', 'التسكين', 'النقل', 'الثقافي'].map((t, i) => (
+              <div key={i} style={{ padding: 8, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}`, textAlign: 'center', fontSize: 10 }}>
+                <div style={{ fontWeight: 700, color: THEME.colors.primary, fontSize: 14 }}>{[88, 92, 85, 79, 95][i]}%</div>
+                <div style={{ color: THEME.colors.textTertiary, marginTop: 2 }}>{t}</div>
+              </div>
+            ))}
+          </div>
+        );
+      case 'leaderboard':
+        return (
+          <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+            {['الإتقان', 'أضواء الإيمان', 'الفرائض', 'الناصرية'].map((name, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < 3 ? `1px dashed ${THEME.colors.border}` : 'none' }}>
+                <div style={{
+                  width: 24, height: 24, borderRadius: '50%',
+                  background: i === 0 ? '#F6C76F' : i === 1 ? '#D8D2C7' : i === 2 ? '#D4965E' : THEME.colors.bgSecondary,
+                  color: i < 3 ? '#fff' : THEME.colors.textTertiary,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 700,
+                }}>{i + 1}</div>
+                <div style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{name}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: THEME.colors.primary }}>{[94, 89, 85, 82][i]}%</div>
+              </div>
+            ))}
+          </div>
+        );
+      case 'scaleDistribution':
+      case 'distribution':
+        return (
+          <div style={{ display: 'flex', gap: 4, padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+            {[
+              { label: 'ممتاز', value: 45, color: '#27500A' },
+              { label: 'جيد جداً', value: 30, color: '#97C459' },
+              { label: 'جيد', value: 15, color: '#F6C76F' },
+              { label: 'مقبول', value: 7, color: '#E89B4C' },
+              { label: 'ضعيف', value: 3, color: '#E24B4A' },
+            ].map((s, i) => (
+              <div key={i} style={{ flex: s.value, textAlign: 'center' }}>
+                <div style={{ height: 50, background: s.color, borderRadius: 4, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 4, color: '#fff', fontSize: 10, fontWeight: 700 }}>{s.value}%</div>
+                <div style={{ fontSize: 9, color: THEME.colors.textTertiary, marginTop: 4 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        );
+      case 'dailyTrend':
+      case 'trend':
+        return (
+          <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80, marginBottom: 4 }}>
+              {[78, 82, 85, 88, 91, 87, 92, 89, 94, 91, 93, 95, 93].map((v, i) => (
+                <div key={i} style={{ flex: 1, height: `${v - 70}%`, background: THEME.colors.info, borderRadius: '4px 4px 0 0', minHeight: 8 }} />
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: THEME.colors.textTertiary, marginTop: 4 }}>
+              <span>1</span><span>5</span><span>9</span><span>13</span>
+            </div>
+          </div>
+        );
+      case 'topBottomTeams':
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ padding: 10, background: THEME.colors.successSoft, borderRadius: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: THEME.colors.success, marginBottom: 6 }}>🏆 الأفضل</div>
+              {['الثقافي 95%', 'الإعاشة 92%', 'النظافة 90%'].map((t, i) => (
+                <div key={i} style={{ fontSize: 10, color: THEME.colors.text, padding: '2px 0' }}>{t}</div>
+              ))}
+            </div>
+            <div style={{ padding: 10, background: THEME.colors.dangerSoft, borderRadius: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: THEME.colors.danger, marginBottom: 6 }}>⚠️ تحتاج اهتمام</div>
+              {['النقل 79%', 'النفايات 81%', 'الخدمات 83%'].map((t, i) => (
+                <div key={i} style={{ fontSize: 10, color: THEME.colors.text, padding: '2px 0' }}>{t}</div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'notes':
+        return (
+          <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+            {[
+              'فريق النقل: تأخر في الالتزام بمواعيد الانطلاق في اليوم 5',
+              'فريق الإعاشة: ملاحظة على درجة حرارة الطعام في وجبة العشاء',
+              'فريق التسكين: شكوى من 3 حجاج بشأن النظافة في الدور الثاني',
+            ].map((n, i) => (
+              <div key={i} style={{ padding: '6px 8px', borderRight: `3px solid ${THEME.colors.warning}`, background: THEME.colors.warningSoft + '40', borderRadius: 4, fontSize: 11, color: THEME.colors.text, marginBottom: 4, lineHeight: 1.5 }}>
+                {n}
+              </div>
+            ))}
+          </div>
+        );
+      case 'header':
+        return (
+          <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}`, textAlign: 'center' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: THEME.colors.primary }}>تقرير يومي - شركة الإتقان</div>
+            <div style={{ fontSize: 11, color: THEME.colors.textTertiary, marginTop: 4 }}>قسم الرجال • اليوم 5 من ذي الحجة 1447هـ</div>
+          </div>
+        );
+      case 'summary':
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: 8, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+            <div style={{ textAlign: 'center', padding: 6 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: THEME.colors.primary }}>54/54</div>
+              <div style={{ fontSize: 10, color: THEME.colors.textTertiary }}>معايير مكتملة</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: 6 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: THEME.colors.success }}>4.6/5</div>
+              <div style={{ fontSize: 10, color: THEME.colors.textTertiary }}>متوسط التقييم</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: 6 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: THEME.colors.warning }}>3</div>
+              <div style={{ fontSize: 10, color: THEME.colors.textTertiary }}>ملاحظات سلبية</div>
+            </div>
+          </div>
+        );
+      case 'achievements':
+      case 'positive':
+        return (
+          <div style={{ padding: 12, background: THEME.colors.successSoft, borderRadius: 6, border: `1px solid ${THEME.colors.success}33` }}>
+            <div style={{ fontSize: 11, color: THEME.colors.success, lineHeight: 1.8 }}>
+              ⭐ فريق الثقافي حصل على تقييم ممتاز في كل المعايير
+              <br/>
+              ⭐ فريق النظافة أكمل المهام قبل الموعد بـ 30 دقيقة
+              <br/>
+              ⭐ تحسن ملحوظ في فريق الاستقبال خلال الأسبوع
+            </div>
+          </div>
+        );
+      case 'attention':
+        return (
+          <div style={{ padding: 12, background: THEME.colors.warningSoft, borderRadius: 6, border: `1px solid ${THEME.colors.warning}33` }}>
+            <div style={{ fontSize: 11, color: THEME.colors.warning, lineHeight: 1.8 }}>
+              ⚠️ فريق النقل: 3 معايير تحتاج مراجعة (تأخر في الانطلاق)
+              <br/>
+              ⚠️ فريق التسكين: نقص في 2 من معدات النظافة
+            </div>
+          </div>
+        );
+      case 'comparison':
+      case 'sessions':
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ padding: 10, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: THEME.colors.info, marginBottom: 4 }}>🌅 الجلسة الصباحية</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: THEME.colors.success }}>92%</div>
+              <div style={{ fontSize: 9, color: THEME.colors.textTertiary }}>27 معيار - 25 مطابق</div>
+            </div>
+            <div style={{ padding: 10, background: '#fff', borderRadius: 6, border: `1px solid ${THEME.colors.border}` }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: THEME.colors.accent, marginBottom: 4 }}>🌆 الجلسة المسائية</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: THEME.colors.success }}>88%</div>
+              <div style={{ fontSize: 9, color: THEME.colors.textTertiary }}>27 معيار - 24 مطابق</div>
+            </div>
+          </div>
+        );
+      default:
+        return (
+          <div style={{ padding: 12, background: '#fff', borderRadius: 6, border: `1px dashed ${THEME.colors.border}`, fontSize: 11, color: THEME.colors.textTertiary, textAlign: 'center' }}>
+            محتوى هذا القسم يعرض البيانات الفعلية للتقرير
+          </div>
+        );
+    }
+  };
+
   return (
     <div style={{
       position: 'fixed', top: 0, right: 0, bottom: 0, left: 0,
-      background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(13, 24, 36, 0.6)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 1000, padding: 16,
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        style={{ background: '#fff', borderRadius: 12, padding: 0, maxWidth: 700, width: '100%', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        style={{ background: '#fff', borderRadius: 12, padding: 0, maxWidth: 720, width: '100%', maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* رأس المعاينة */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: `1px solid ${THEME.colors.border}` }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700 }}>معاينة: {title}</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: `1px solid ${THEME.colors.border}`, background: THEME.colors.bgSecondary }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Eye size={20} color={THEME.colors.info} />
+            <h3 style={{ fontSize: 15, fontWeight: 700 }}>معاينة: {title}</h3>
+          </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
             <X size={20} />
           </button>
         </div>
 
-        {/* محتوى المعاينة */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 20, background: THEME.colors.bgSecondary }}>
+        {/* محتوى المعاينة بمظهر التقرير الفعلي */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 20, background: '#F5F1E8' }}>
           {/* رأس التقرير الوهمي */}
-          <div style={{ background: '#fff', borderRadius: 8, padding: 16, marginBottom: 12, textAlign: 'center', border: `2px solid ${THEME.colors.accent}` }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: THEME.colors.primary, marginBottom: 4 }}>
-              تقرير تجريبي
+          <div style={{
+            background: 'linear-gradient(135deg, #1B2D3E 0%, #2C4055 100%)',
+            color: '#fff',
+            borderRadius: 10, padding: 16, marginBottom: 14, textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+              🎯 شركة إثراء التجربة
             </div>
-            <div style={{ fontSize: 12, color: THEME.colors.textTertiary }}>
-              {new Date().toLocaleString('ar-SA', { dateStyle: 'medium' })}
+            <div style={{ fontSize: 11, opacity: 0.85 }}>
+              تقرير تجريبي - {new Date().toLocaleString('ar-SA', { dateStyle: 'long' })}
             </div>
           </div>
 
           {/* الأقسام المُفعَّلة بالترتيب */}
           {sections.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 40, color: THEME.colors.textTertiary, fontSize: 13 }}>
-              لا توجد أقسام مفعّلة. فعّل قسماً واحداً على الأقل.
+            <div style={{ textAlign: 'center', padding: 60, color: THEME.colors.textTertiary, fontSize: 13, background: '#fff', borderRadius: 8 }}>
+              <AlertCircle size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
+              <div>لا توجد أقسام مفعّلة</div>
+              <div style={{ fontSize: 11, marginTop: 4 }}>فعّل قسماً واحداً على الأقل لرؤية المعاينة</div>
             </div>
           ) : (
             sections.map((s, i) => (
               <div key={s.id} style={{
-                background: '#fff', borderRadius: 8, padding: 14, marginBottom: 10,
-                borderRight: `3px solid ${THEME.colors.accent}`,
+                background: '#fff', borderRadius: 10, padding: 14, marginBottom: 10,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 8, borderBottom: `2px solid ${THEME.colors.accent}` }}>
                   <div style={{
-                    width: 24, height: 24, borderRadius: 6,
+                    width: 28, height: 28, borderRadius: 8,
                     background: THEME.colors.primary, color: '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 11, fontWeight: 700,
+                    fontSize: 12, fontWeight: 700,
                   }}>{i + 1}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: THEME.colors.primary }}>{s.label}</div>
                 </div>
-                <div style={{
-                  background: THEME.colors.bgSecondary, borderRadius: 6, padding: 12,
-                  fontSize: 11, color: THEME.colors.textTertiary, lineHeight: 1.6,
-                  border: `1px dashed ${THEME.colors.border}`,
-                }}>
-                  محتوى القسم سيظهر هنا في التقرير الفعلي
-                </div>
+                {renderSectionContent(s.id)}
               </div>
             ))
           )}
+
+          {/* تذييل التقرير */}
+          {sections.length > 0 && (
+            <div style={{
+              marginTop: 14, padding: 10, textAlign: 'center',
+              fontSize: 10, color: THEME.colors.textTertiary,
+              borderTop: `1px dashed ${THEME.colors.border}`,
+            }}>
+              نُظِّمت بواسطة منصة إثراء التجربة
+            </div>
+          )}
         </div>
 
-        <div style={{ padding: 12, borderTop: `1px solid ${THEME.colors.border}`, textAlign: 'center', fontSize: 11, color: THEME.colors.textTertiary }}>
-          هذه معاينة للترتيب والأقسام المُفعَّلة. التقرير الفعلي سيحتوي على البيانات الكاملة.
+        <div style={{ padding: 12, borderTop: `1px solid ${THEME.colors.border}`, textAlign: 'center', fontSize: 11, color: THEME.colors.textTertiary, background: THEME.colors.bgSecondary }}>
+          💡 هذه معاينة ببيانات وهمية. التقرير الفعلي سيحتوي على بياناتك الحقيقية.
         </div>
       </div>
     </div>

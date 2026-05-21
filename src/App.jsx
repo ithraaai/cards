@@ -21,6 +21,7 @@ import {
 
 import { ContractorsModule } from './components/ContractorsModule.jsx';
 import { MonitorPage } from './components/MonitorPage.jsx';
+import { APP_VERSION, APP_BUILD_DATE, APP_VERSION_NOTES } from './data/version.js';
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -39,6 +40,9 @@ export default function App() {
       else localStorage.removeItem('ithra_user');
     } catch (err) { console.error('فشل حفظ الجلسة:', err); }
   }, [user]);
+
+  // حالة modal الخروج
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [page, setPage] = useState('dashboard');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { toasts, show } = useToast();
@@ -235,7 +239,7 @@ export default function App() {
         })}
       </nav>
       <div style={{ padding: 18, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <Button variant="danger" fullWidth icon={LogOut} onClick={() => { setUser(null); setMobileSidebarOpen(false); }}>
+        <Button variant="danger" fullWidth icon={LogOut} onClick={() => { setShowLogoutConfirm(true); setMobileSidebarOpen(false); }}>
           تسجيل الخروج
         </Button>
       </div>
@@ -305,7 +309,7 @@ export default function App() {
               متصل
             </div>
             <button
-              onClick={() => { if (confirm('هل تريد تسجيل الخروج؟')) setUser(null); }}
+              onClick={() => setShowLogoutConfirm(true)}
               title="تسجيل الخروج"
               style={{
                 display: 'flex',
@@ -420,9 +424,99 @@ export default function App() {
             {page === 'monitor' && (
               <MonitorPage user={user} companies={companies} toast={toast} />
             )}
+
+            {/* Footer مع رقم الإصدار */}
+            <footer style={{
+              marginTop: 40, padding: '16px 8px',
+              borderTop: `1px dashed ${THEME.colors.border}`,
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 11, color: THEME.colors.textTertiary, lineHeight: 1.6 }}>
+                <span style={{ fontWeight: 600 }}>منصة إدارة عمليات إثراء التجربة</span>
+                {' • '}
+                <span>الإصدار {APP_VERSION}</span>
+                {' • '}
+                <span>بُني في {APP_BUILD_DATE}</span>
+              </div>
+              <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 4, opacity: 0.7 }}>
+                {APP_VERSION_NOTES}
+              </div>
+            </footer>
           </main>
         </div>
       </div>
+
+      {/* Modal تأكيد الخروج */}
+      {showLogoutConfirm && (
+        <div
+          onClick={() => setShowLogoutConfirm(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(13, 24, 36, 0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 2000, padding: 20,
+            animation: 'fadeIn 0.2s ease-out',
+          }}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff',
+              borderRadius: 16,
+              padding: 28,
+              maxWidth: 380,
+              width: '100%',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+              animation: 'scaleIn 0.2s ease-out',
+              textAlign: 'center',
+            }}>
+            {/* أيقونة */}
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: THEME.colors.dangerSoft,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <LogOut size={30} color={THEME.colors.danger} strokeWidth={2} />
+            </div>
+
+            {/* عنوان */}
+            <h3 style={{
+              fontSize: 18, fontWeight: 700, color: THEME.colors.text,
+              marginBottom: 8,
+            }}>
+              تسجيل الخروج
+            </h3>
+
+            {/* وصف */}
+            <p style={{
+              fontSize: 13, color: THEME.colors.textSecondary,
+              lineHeight: 1.7, marginBottom: 24,
+            }}>
+              هل أنت متأكد من رغبتك في تسجيل الخروج من حساب
+              <br />
+              <strong style={{ color: THEME.colors.text }}>{user.name}</strong>؟
+            </p>
+
+            {/* الأزرار */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button
+                variant="outline"
+                fullWidth
+                onClick={() => setShowLogoutConfirm(false)}>
+                إلغاء
+              </Button>
+              <Button
+                variant="danger"
+                fullWidth
+                icon={LogOut}
+                onClick={() => { setShowLogoutConfirm(false); setUser(null); }}>
+                تأكيد الخروج
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
