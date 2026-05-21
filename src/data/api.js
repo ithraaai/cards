@@ -26,25 +26,31 @@ export async function findUserByUsername(username) {
 }
 
 export async function createUser(user) {
+  const payload = {
+    name: user.name,
+    username: user.username.toLowerCase(),
+    role: user.role,
+    company_id: user.companyId || null,
+    section: user.section || null,
+    phone: user.phone || null,
+    contractor_company_id: user.contractorCompanyId || null,
+    contractor_scope_domain: user.role === 'contractor_monitor_food' ? 'food'
+      : user.role === 'contractor_monitor_transport' ? 'transport'
+      : user.role === 'contractor_monitor_security' ? 'security'
+      : null,
+    pmo_domains: user.role === 'contractor_pmo' && user.pmoDomains?.length > 0 ? user.pmoDomains : null,
+    active: user.active !== false,
+  };
+  console.log('📤 إرسال إلى Supabase:', JSON.stringify(payload, null, 2));
   const { data, error } = await supabase
     .from('users')
-    .insert({
-      name: user.name,
-      username: user.username.toLowerCase(),
-      role: user.role,
-      company_id: user.companyId || null,
-      section: user.section || null,
-      phone: user.phone || null,
-      contractor_company_id: user.contractorCompanyId || null,
-      contractor_scope_domain: user.role === 'contractor_monitor_food' ? 'food'
-        : user.role === 'contractor_monitor_transport' ? 'transport'
-        : user.role === 'contractor_monitor_security' ? 'security'
-        : null,
-      pmo_domains: user.role === 'contractor_pmo' && user.pmoDomains?.length > 0 ? user.pmoDomains : null,
-      active: user.active !== false,
-    })
+    .insert(payload)
     .select().single();
-  if (error) throw error;
+  if (error) {
+    console.error('❌ خطأ Supabase الكامل:', error);
+    console.error('❌ التفاصيل:', error.message, error.details, error.hint, error.code);
+    throw error;
+  }
   return data;
 }
 
