@@ -534,7 +534,7 @@ function SessionFillPage({ user, companyId, domainId, company, domainInfo, check
       </div>
 
       {/* زر الإكمال - ثابت في الأسفل */}
-      {!isSubmitted && (
+      {!isSubmitted ? (
         <div style={{
           position: 'sticky', bottom: 12, marginTop: 16,
           background: '#fff', padding: 12, borderRadius: 12,
@@ -555,9 +555,64 @@ function SessionFillPage({ user, companyId, domainId, company, domainInfo, check
               : `أكمل المعايير المتبقية (${criteria.length - totalFilled} متبقي)`}
           </Button>
         </div>
+      ) : (
+        <div style={{
+          position: 'sticky', bottom: 12, marginTop: 16,
+          background: '#fff', padding: 12, borderRadius: 12,
+          boxShadow: '0 -4px 20px rgba(0,0,0,0.08)', border: `1.5px solid ${THEME.colors.success}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <CheckCircle2 size={20} color={THEME.colors.success} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: THEME.colors.success }}>تم إرسال التقرير</div>
+              <div style={{ fontSize: 11, color: THEME.colors.textTertiary }}>
+                {compliantCount} مطابق • {violationCount} مخالف • {criteria.length} معيار
+              </div>
+            </div>
+          </div>
+          <Button variant="outline" icon={FileText} fullWidth
+            onClick={() => exportSessionCSV(criteria, evaluations, checklist, company, dateId)}>
+            تصدير التقرير CSV
+          </Button>
+        </div>
       )}
     </div>
   );
+}
+
+// =================================================================
+// تصدير الجلسة إلى CSV
+// =================================================================
+function exportSessionCSV(criteria, evaluations, checklist, company, dateId) {
+  const headers = ['#', 'المعيار', 'حرج؟', 'النتيجة', 'الملاحظة'];
+  const rows = criteria.map((c, i) => {
+    const e = evaluations[c.id];
+    const status = e?.status === 'compliant' ? 'مطابق' : e?.status === 'violation' ? 'مخالف' : e?.status === 'na' ? 'غير منطبق' : '—';
+    return [i + 1, c.name_ar, c.is_critical ? 'نعم' : 'لا', status, e?.note || ''];
+  });
+
+  const metaRows = [
+    ['اسم القائمة', checklist.name_ar],
+    ['الشركة', company?.name || ''],
+    ['اليوم', dateId ? `اليوم ${dateId} من ذي الحجة` : 'بدون يوم'],
+    ['تاريخ التقرير', new Date().toLocaleString('ar-SA')],
+    [''],
+  ];
+
+  const csv = [...metaRows, headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  const safeName = (checklist.name_ar || 'تقرير').replace(/[\\/:*?"<>|]/g, '-').substring(0, 30);
+  link.setAttribute('download', `${safeName}-اليوم${dateId || 'X'}-${new Date().toISOString().split('T')[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 // =================================================================

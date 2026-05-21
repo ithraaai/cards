@@ -598,6 +598,11 @@ function ViolationsPage({ domains, companies, onBack, toast }) {
             <h2 style={{ fontSize: 16, fontWeight: 700 }}>سجل المخالفات والشواهد</h2>
             <Badge color="danger" style={{ fontSize: 11 }}>{violations.length} مخالفة</Badge>
           </div>
+          {violations.length > 0 && (
+            <Button size="sm" variant="outline" icon={FileText} onClick={() => exportViolationsCSV(violations, companies, domains)}>
+              تصدير CSV
+            </Button>
+          )}
         </div>
       </Card>
 
@@ -949,4 +954,43 @@ function KpiBox({ label, value, color, icon: Icon }) {
       <div style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
     </div>
   );
+}
+
+// =================================================================
+// تصدير المخالفات إلى CSV (Excel-compatible)
+// =================================================================
+function exportViolationsCSV(violations, companies, domains) {
+  const domainName = (id) => domains.find(d => d.id === id)?.name_ar || id;
+  const companyName = (id) => companies.find(c => c.id === id)?.name || 'غير معروف';
+
+  const headers = ['التاريخ', 'اليوم', 'المجال', 'الشركة', 'المعيار', 'الوصف', 'المستوى', 'حرج؟', 'الحالة', 'تم الإبلاغ؟', 'تاريخ الإبلاغ', 'الإجراء المتخذ'];
+  const rows = violations.map(v => [
+    v.violation_date || '',
+    v.date_id ? `اليوم ${v.date_id}` : '',
+    domainName(v.domain_id),
+    companyName(v.company_id),
+    v.criterion?.name_ar || '',
+    v.description || '',
+    v.level?.name_ar || v.level_id,
+    v.criterion?.is_critical ? 'نعم' : 'لا',
+    v.status === 'open' ? 'مفتوحة' : v.status === 'closed' ? 'مغلقة' : 'قيد المعالجة',
+    v.notified_party ? 'نعم' : 'لا',
+    v.notified_at ? new Date(v.notified_at).toLocaleString('ar-SA') : '',
+    v.action_taken || '',
+  ]);
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  // BOM لدعم العربية في Excel
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `المخالفات-${new Date().toISOString().split('T')[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
