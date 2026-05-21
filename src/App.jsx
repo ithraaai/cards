@@ -23,7 +23,22 @@ import { ContractorsModule } from './components/ContractorsModule.jsx';
 import { MonitorPage } from './components/MonitorPage.jsx';
 
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    // استعادة المستخدم من localStorage عند تحميل الصفحة
+    try {
+      const saved = localStorage.getItem('ithra_user');
+      if (saved) return JSON.parse(saved);
+    } catch (err) { console.error('فشل قراءة الجلسة:', err); }
+    return null;
+  });
+
+  // حفظ المستخدم في localStorage عند تغييره
+  useEffect(() => {
+    try {
+      if (user) localStorage.setItem('ithra_user', JSON.stringify(user));
+      else localStorage.removeItem('ithra_user');
+    } catch (err) { console.error('فشل حفظ الجلسة:', err); }
+  }, [user]);
   const [page, setPage] = useState('dashboard');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { toasts, show } = useToast();
@@ -289,6 +304,29 @@ export default function App() {
               <Wifi size={14} strokeWidth={2.5} />
               متصل
             </div>
+            <button
+              onClick={() => { if (confirm('هل تريد تسجيل الخروج؟')) setUser(null); }}
+              title="تسجيل الخروج"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                background: THEME.colors.dangerSoft,
+                color: THEME.colors.danger,
+                border: `1px solid ${THEME.colors.danger}33`,
+                borderRadius: THEME.radius.full,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = THEME.colors.danger; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = THEME.colors.dangerSoft; e.currentTarget.style.color = THEME.colors.danger; }}>
+              <LogOut size={14} strokeWidth={2.5} />
+              <span style={{ display: window.innerWidth > 600 ? 'inline' : 'none' }}>خروج</span>
+            </button>
           </div>
         </div>
 

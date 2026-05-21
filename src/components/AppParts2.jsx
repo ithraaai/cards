@@ -1002,6 +1002,7 @@ function ReportSectionsManager({ title, description, defaultSections, savedSecti
 
   const [sections, setSections] = useState(initial);
   const [dragIdx, setDragIdx] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => { setSections(initial); }, [savedSections]);
 
@@ -1114,10 +1115,95 @@ function ReportSectionsManager({ title, description, defaultSections, savedSecti
         ))}
       </div>
 
-      <Button variant="primary" icon={Save} onClick={() => onSave(sections)} fullWidth>
-        حفظ ترتيب وتفعيل الأقسام
-      </Button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button variant="outline" icon={Eye} onClick={() => setShowPreview(true)} style={{ flex: 1 }}>
+          معاينة شكل التقرير
+        </Button>
+        <Button variant="primary" icon={Save} onClick={() => onSave(sections)} style={{ flex: 1 }}>
+          حفظ الترتيب
+        </Button>
+      </div>
+
+      {showPreview && (
+        <ReportPreviewModal
+          title={title}
+          sections={sections.filter(s => s.enabled)}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </Card>
+  );
+}
+
+// =================================================================
+// Modal معاينة التقرير
+// =================================================================
+function ReportPreviewModal({ title, sections, onClose }) {
+  return (
+    <div style={{
+      position: 'fixed', top: 0, right: 0, bottom: 0, left: 0,
+      background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000, padding: 16,
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background: '#fff', borderRadius: 12, padding: 0, maxWidth: 700, width: '100%', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* رأس المعاينة */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: `1px solid ${THEME.colors.border}` }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700 }}>معاينة: {title}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* محتوى المعاينة */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 20, background: THEME.colors.bgSecondary }}>
+          {/* رأس التقرير الوهمي */}
+          <div style={{ background: '#fff', borderRadius: 8, padding: 16, marginBottom: 12, textAlign: 'center', border: `2px solid ${THEME.colors.accent}` }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: THEME.colors.primary, marginBottom: 4 }}>
+              تقرير تجريبي
+            </div>
+            <div style={{ fontSize: 12, color: THEME.colors.textTertiary }}>
+              {new Date().toLocaleString('ar-SA', { dateStyle: 'medium' })}
+            </div>
+          </div>
+
+          {/* الأقسام المُفعَّلة بالترتيب */}
+          {sections.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: THEME.colors.textTertiary, fontSize: 13 }}>
+              لا توجد أقسام مفعّلة. فعّل قسماً واحداً على الأقل.
+            </div>
+          ) : (
+            sections.map((s, i) => (
+              <div key={s.id} style={{
+                background: '#fff', borderRadius: 8, padding: 14, marginBottom: 10,
+                borderRight: `3px solid ${THEME.colors.accent}`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{
+                    width: 24, height: 24, borderRadius: 6,
+                    background: THEME.colors.primary, color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700,
+                  }}>{i + 1}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: THEME.colors.primary }}>{s.label}</div>
+                </div>
+                <div style={{
+                  background: THEME.colors.bgSecondary, borderRadius: 6, padding: 12,
+                  fontSize: 11, color: THEME.colors.textTertiary, lineHeight: 1.6,
+                  border: `1px dashed ${THEME.colors.border}`,
+                }}>
+                  محتوى القسم سيظهر هنا في التقرير الفعلي
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ padding: 12, borderTop: `1px solid ${THEME.colors.border}`, textAlign: 'center', fontSize: 11, color: THEME.colors.textTertiary }}>
+          هذه معاينة للترتيب والأقسام المُفعَّلة. التقرير الفعلي سيحتوي على البيانات الكاملة.
+        </div>
+      </div>
+    </div>
   );
 }
 

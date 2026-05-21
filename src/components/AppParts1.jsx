@@ -94,7 +94,10 @@ function ConnectionErrorScreen({ error, onRetry }) {
 }
 
 function LoginPage({ onLogin, toast }) {
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => {
+    try { return localStorage.getItem('ithra_last_username') || ''; }
+    catch { return ''; }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -107,6 +110,8 @@ function LoginPage({ onLogin, toast }) {
       if (!user) setError('اسم المستخدم غير صحيح أو الحساب معطّل');
       else {
         const appUser = api.dbUserToApp(user);
+        // حفظ آخر اسم مستخدم استخدم بنجاح
+        try { localStorage.setItem('ithra_last_username', username); } catch {}
         toast.show(`مرحباً ${appUser.name}`, 'success');
         onLogin(appUser);
       }
