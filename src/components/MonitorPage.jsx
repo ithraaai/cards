@@ -9,6 +9,8 @@ import { Button } from './Button.jsx';
 import { Card, Badge } from './Card.jsx';
 import { THEME } from '../data/theme.js';
 import * as cApi from '../data/contractorsApi.js';
+import * as api from '../data/api.js';
+import { getDefaultDateId } from '../data/seed.js';
 
 // =================================================================
 // الصفحة الرئيسية لشاشة المراقب
@@ -83,26 +85,34 @@ export function MonitorPage({ user, companies, toast }) {
 }
 
 // =================================================================
-// الصفحة الرئيسية: ترحيب + اختيار اليوم والقائمة
+// الصفحة الرئيسية: قوائم اليوم في الأعلى + الجاهزية كأيقونات
 // =================================================================
 function MonitorHome({ user, company, domainId, domainInfo, onOpenSession, toast }) {
   const [checklists, setChecklists] = useState([]);
-  const [selectedDateId, setSelectedDateId] = useState('1');
+  const [settings, setSettings] = useState(null);
+  const [selectedDateId, setSelectedDateId] = useState(null);
   const [recentSessions, setRecentSessions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const [cl, recents] = await Promise.all([
+        // جلب الإعدادات + القوائم + الجلسات السابقة
+        const [cl, recents, settingsData] = await Promise.all([
           cApi.getChecklists(domainId),
           cApi.getMonitorSessions(user.id, 10),
+          api.getSettings(),
         ]);
         setChecklists(cl);
         setRecentSessions(recents);
+        setSettings(settingsData);
+        // اليوم الحالي افتراضياً (1-13 بناءً على تاريخ بداية الموسم)
+        const today = getDefaultDateId(settingsData?.season_start_date);
+        setSelectedDateId(today);
       } catch (err) {
         console.error(err);
         toast.show('فشل تحميل البيانات', 'error');
+        setSelectedDateId('1');
       } finally { setLoading(false); }
     })();
   }, [domainId, user.id]);
@@ -114,143 +124,184 @@ function MonitorHome({ user, company, domainId, domainInfo, onOpenSession, toast
   const Icon = domainInfo.icon;
   const dateIds = Array.from({ length: 13 }, (_, i) => String(i + 1));
 
-  // تصنيف القوائم حسب المرحلة
-  const preChecklists = checklists.filter(c => c.phase_id === 'pre');
+  // تصنيف القوائم
   const dailyChecklists = checklists.filter(c => c.phase_id === 'daily');
-  const closingChecklists = checklists.filter(c => c.phase_id === 'closing');
+  // دمج "الأولية" + "الختامية" في "تقييم الجاهزية"
+  const readinessChecklists = checklists.filter(c => c.phase_id === 'pre' || c.phase_id === 'closing');
+
+  // فلترة القوائم اليومية حسب اليوم (مثلاً يوم عرفة = 9 فقط)
+  const visibleDailyChecklists = dailyChecklists.filter(cl => {
+    const code = cl.code?.toLowerCase() || '';
+    const name = cl.name_ar || '';
+    // قوائم خاصة بيوم عرفة
+    if (code.includes('arafah') || name.includes('عرفة')) return selectedDateId === '9';
+    // قوائم خاصة بيوم العيد (10 ذو الحجة)
+    if (code.includes('eid') || name.includes('العيد') || name.includes('عيد')) return selectedDateId === '10';
+    // قوائم خاصة بأيام النحر/التشريق (10-13)
+    if (code.includes('nahr') || code.includes('tashreeq') || name.includes('النحر') || name.includes('التشريق')) {
+      return ['10', '11', '12', '13'].includes(selectedDateId);
+    }
+    // قوائم أيام الذروة (8-13)
+    if (code.includes('peak') || name.includes('الذروة') || name.includes('ذروة')) {
+      return ['8', '9', '10', '11', '12', '13'].includes(selectedDateId);
+    }
+    // باقي القوائم اليومية تظهر دائماً
+    return true;
+  });
 
   return (
     <div>
-      {/* رأس مع معلومات المراقب */}
-      <Card padding={18} style={{
+      {/* رأس مدمج مع معلومات المراقب */}
+      <Card padding={14} style={{
         marginBottom: 14,
         background: `linear-gradient(135deg, ${domainInfo.color} 0%, ${darken(domainInfo.color)} 100%)`,
         border: 'none',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div style={{
-            width: 52, height: 52, borderRadius: 12,
+            width: 44, height: 44, borderRadius: 10,
             background: 'rgba(255,255,255,0.2)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
-            <Icon size={26} color="#fff" strokeWidth={2.2} />
+            <Icon size={22} color="#fff" strokeWidth={2.2} />
           </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>مرحباً</div>
-            <h2 style={{ fontSize: 17, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{user.name}</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.85)', flexWrap: 'wrap' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                <ListChecks size={12} /> مراقب {domainInfo.name}
-              </span>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{user.name}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'rgba(255,255,255,0.85)', flexWrap: 'wrap' }}>
+              <span>مراقب {domainInfo.name}</span>
               <span style={{ opacity: 0.5 }}>•</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                <Building2 size={12} /> {company?.name || 'شركة غير محددة'}
-              </span>
+              <span>{company?.name || 'شركة غير محددة'}</span>
             </div>
           </div>
         </div>
       </Card>
 
-      {/* اختيار اليوم */}
-      <Card padding={14} style={{ marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <Calendar size={16} color={domainInfo.color} />
-          <h3 style={{ fontSize: 14, fontWeight: 700 }}>اختر اليوم (ذو الحجة)</h3>
-        </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {dateIds.map(id => {
-            const active = selectedDateId === id;
-            return (
-              <button key={id} onClick={() => setSelectedDateId(id)}
-                style={{
-                  width: 40, height: 40, borderRadius: 8,
-                  background: active ? domainInfo.color : '#fff',
-                  color: active ? '#fff' : THEME.colors.text,
-                  border: `1.5px solid ${active ? domainInfo.color : THEME.colors.border}`,
-                  fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                  transition: 'all 0.15s',
-                }}>
-                {id}
-              </button>
-            );
-          })}
-        </div>
-      </Card>
+      {/* المحتوى الرئيسي - تصميم عمودين على الديسكتوب */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 14, alignItems: 'flex-start' }}>
+        {/* العمود الأيسر/الرئيسي: القوائم اليومية */}
+        <div>
+          {/* اختيار اليوم (تظهر فوق القوائم اليومية مباشرة) */}
+          <Card padding={12} style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <Calendar size={14} color={domainInfo.color} />
+              <span style={{ fontSize: 12, fontWeight: 700 }}>اختر اليوم (ذو الحجة)</span>
+              <Badge color="info" style={{ fontSize: 10, marginRight: 'auto' }}>
+                اليوم الحالي: {getDefaultDateId(settings?.season_start_date)}
+              </Badge>
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {dateIds.map(id => {
+                const active = selectedDateId === id;
+                const isToday = getDefaultDateId(settings?.season_start_date) === id;
+                return (
+                  <button key={id} onClick={() => setSelectedDateId(id)}
+                    style={{
+                      width: 36, height: 36, borderRadius: 8,
+                      background: active ? domainInfo.color : '#fff',
+                      color: active ? '#fff' : THEME.colors.text,
+                      border: `1.5px solid ${active ? domainInfo.color : isToday ? domainInfo.color + '55' : THEME.colors.border}`,
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                      transition: 'all 0.15s', position: 'relative',
+                    }}>
+                    {id}
+                    {isToday && !active && (
+                      <div style={{
+                        position: 'absolute', top: -3, right: -3,
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: domainInfo.color,
+                      }} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
 
-      {/* القوائم اليومية - الأكثر استخداماً */}
-      {dailyChecklists.length > 0 && (
-        <Card padding={14} style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: `1px dashed ${THEME.colors.border}` }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>📋 القوائم اليومية</span>
-            <Badge color="info" style={{ fontSize: 10 }}>اليوم {selectedDateId}</Badge>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {dailyChecklists.map(cl => (
-              <ChecklistButton key={cl.id} checklist={cl} color={domainInfo.color}
-                onClick={() => onOpenSession(cl, selectedDateId)} />
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* القوائم الأولية */}
-      {preChecklists.length > 0 && (
-        <Card padding={14} style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: `1px dashed ${THEME.colors.border}` }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>📌 القوائم الأولية (مرة واحدة قبل الموسم)</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {preChecklists.map(cl => (
-              <ChecklistButton key={cl.id} checklist={cl} color={domainInfo.color}
-                onClick={() => onOpenSession(cl, null)} />
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* القوائم الختامية */}
-      {closingChecklists.length > 0 && (
-        <Card padding={14} style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: `1px dashed ${THEME.colors.border}` }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>🏁 القوائم النهائية</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {closingChecklists.map(cl => (
-              <ChecklistButton key={cl.id} checklist={cl} color={domainInfo.color}
-                onClick={() => onOpenSession(cl, selectedDateId)} />
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* سجل الجلسات السابقة */}
-      {recentSessions.length > 0 && (
-        <Card padding={14}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: `1px dashed ${THEME.colors.border}` }}>
-            <Clock size={14} color={THEME.colors.textSecondary} />
-            <span style={{ fontSize: 13, fontWeight: 700 }}>الجلسات الأخيرة</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {recentSessions.slice(0, 5).map(s => (
-              <div key={s.id} style={{
-                padding: 10, background: THEME.colors.bgSecondary, borderRadius: 8,
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                fontSize: 11, color: THEME.colors.textSecondary,
-              }}>
-                <div>
-                  <div style={{ fontWeight: 600, color: THEME.colors.text }}>{s.checklist?.name_ar || 'قائمة'}</div>
-                  <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 2 }}>
-                    {s.date_id ? `اليوم ${s.date_id}` : 'بدون يوم'} • {new Date(s.created_at).toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' })}
-                  </div>
-                </div>
-                <Badge color={s.status === 'submitted' ? 'success' : s.status === 'approved' ? 'info' : 'warning'} style={{ fontSize: 10 }}>
-                  {s.status === 'submitted' ? 'مُرسلة' : s.status === 'approved' ? 'مُعتمدة' : 'قيد الإكمال'}
-                </Badge>
+          {/* القوائم اليومية - بارزة في الأعلى */}
+          {visibleDailyChecklists.length > 0 ? (
+            <Card padding={14} style={{ marginBottom: 12, border: `2px solid ${domainInfo.color}33` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: `1px dashed ${THEME.colors.border}` }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: domainInfo.color }}>📋 قوائم اليوم {selectedDateId}</span>
               </div>
-            ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {visibleDailyChecklists.map(cl => (
+                  <ChecklistButton key={cl.id} checklist={cl} color={domainInfo.color}
+                    onClick={() => onOpenSession(cl, selectedDateId)} />
+                ))}
+              </div>
+            </Card>
+          ) : (
+            <Card padding={20} style={{ marginBottom: 12, textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: THEME.colors.textTertiary }}>
+                لا توجد قوائم تشغيلية متاحة لليوم {selectedDateId}
+              </div>
+            </Card>
+          )}
+
+          {/* سجل الجلسات السابقة */}
+          {recentSessions.length > 0 && (
+            <Card padding={14}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: `1px dashed ${THEME.colors.border}` }}>
+                <Clock size={14} color={THEME.colors.textSecondary} />
+                <span style={{ fontSize: 13, fontWeight: 700 }}>الجلسات الأخيرة</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {recentSessions.slice(0, 5).map(s => (
+                  <div key={s.id} style={{
+                    padding: 10, background: THEME.colors.bgSecondary, borderRadius: 8,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    fontSize: 11, color: THEME.colors.textSecondary,
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 600, color: THEME.colors.text }}>{s.checklist?.name_ar || 'قائمة'}</div>
+                      <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginTop: 2 }}>
+                        {s.date_id ? `اليوم ${s.date_id}` : 'بدون يوم'} • {new Date(s.created_at).toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' })}
+                      </div>
+                    </div>
+                    <Badge color={s.status === 'submitted' ? 'success' : s.status === 'approved' ? 'info' : 'warning'} style={{ fontSize: 10 }}>
+                      {s.status === 'submitted' ? 'مُرسلة' : s.status === 'approved' ? 'مُعتمدة' : 'قيد الإكمال'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* العمود الأيمن (الجانبي): تقييم الجاهزية */}
+        {readinessChecklists.length > 0 && (
+          <div style={{ minWidth: 240, maxWidth: 280 }}>
+            <Card padding={14} style={{ background: THEME.colors.bgSecondary, border: `1px solid ${THEME.colors.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, paddingBottom: 8, borderBottom: `1px dashed ${THEME.colors.border}` }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>📌 تقييم الجاهزية</span>
+              </div>
+              <div style={{ fontSize: 10, color: THEME.colors.textTertiary, marginBottom: 8, lineHeight: 1.5 }}>
+                قوائم تُعبَّأ قبل الموسم أو في نهايته
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {readinessChecklists.map(cl => (
+                  <button key={cl.id}
+                    onClick={() => onOpenSession(cl, cl.phase_id === 'pre' ? null : selectedDateId)}
+                    style={{
+                      padding: '10px 12px', background: '#fff',
+                      border: `1px solid ${domainInfo.color}33`,
+                      borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                      textAlign: 'right', display: 'flex', alignItems: 'center', gap: 8,
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = `${domainInfo.color}08`; e.currentTarget.style.borderColor = domainInfo.color; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = `${domainInfo.color}33`; }}>
+                    <ChevronLeft size={14} color={domainInfo.color} style={{ flexShrink: 0 }} />
+                    <div style={{ flex: 1, fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>
+                      {cl.name_ar}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </Card>
           </div>
-        </Card>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -537,7 +588,8 @@ function CriterionRow({ index, criterion, evaluation, saving, disabled, domainCo
               {criterion.description}
             </div>
           )}
-          {criterion.required_qty && (
+          {/* عرض المطلوب فقط للمعايير الرقمية أو النسب - وليس مطابق/مخالف */}
+          {criterion.required_qty && ['number', 'ratio', 'temperature', 'time'].includes(criterion.answer_type) && (
             <div style={{ fontSize: 10, color: THEME.colors.info, marginTop: 4, fontWeight: 600 }}>
               المطلوب: {criterion.required_qty} {criterion.qty_unit}
             </div>
